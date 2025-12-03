@@ -188,17 +188,27 @@ async function startBot() {
     const loginData = {
         accessToken: process.env.INSTAGRAM_ACCESS_TOKEN || process.env.IG_ACCESS_TOKEN,
         igUserID: process.env.INSTAGRAM_PAGE_ID || process.env.IG_USER_ID,
-        verifyToken: process.env.INSTAGRAM_VERIFY_TOKEN || process.env.IG_VERIFY_TOKEN || "goatbot_ig_verify"
+        verifyToken: process.env.INSTAGRAM_VERIFY_TOKEN || process.env.IG_VERIFY_TOKEN || "goatbot_ig_verify",
+        webhookPort: process.env.PORT || 5000
     };
     
     if (!loginData.accessToken || !loginData.igUserID) {
         log.error("LOGIN", "Missing INSTAGRAM_ACCESS_TOKEN or INSTAGRAM_PAGE_ID in environment");
         log.info("LOGIN", "Set these in .env file or Secrets tab");
+        log.info("SETUP", "Follow Instagram Graph API setup guide:");
+        log.info("SETUP", "1. Create Facebook App with Instagram permissions");
+        log.info("SETUP", "2. Get Page Access Token with instagram_manage_messages scope");
+        log.info("SETUP", "3. Configure webhook to https://your-domain/webhook");
         process.exit(1);
     }
     
     try {
-        const api = login(loginData);
+        const api = await new Promise((resolve, reject) => {
+            login(loginData, (err, apiInstance) => {
+                if (err) reject(err);
+                else resolve(apiInstance);
+            });
+        });
         
         log.success("LOGIN", "Connected to Instagram API");
         log.info("BOT", `Bot ID: ${loginData.igUserID}`);

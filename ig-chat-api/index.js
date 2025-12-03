@@ -234,26 +234,38 @@ function login(loginData, options, callback) {
     console.log("[ig-chat-api] Initializing Instagram Chat API...");
     console.log(`[ig-chat-api] Page ID: ${ctx.pageID}`);
     console.log(`[ig-chat-api] API Version: ${ctx.apiVersion}`);
+    console.log(`[ig-chat-api] Webhook Port: ${ctx.globalOptions.webhookPort}`);
     
     const axios = require("axios");
+    
+    // Validate token
     axios.get(`${ctx.graphApiBase}/${ctx.apiVersion}/me`, {
         params: {
             access_token: ctx.accessToken,
-            fields: "id,name"
+            fields: "id,name,instagram_business_account"
         }
     })
     .then(response => {
-        console.log(`[ig-chat-api] Connected as: ${response.data.name || response.data.id}`);
+        console.log(`[ig-chat-api] ✓ Connected as: ${response.data.name || response.data.id}`);
+        if (response.data.instagram_business_account) {
+            console.log(`[ig-chat-api] ✓ Instagram Business Account linked`);
+        }
         const api = buildAPI(ctx);
         callback(null, api);
     })
     .catch(error => {
-        if (globalOptions.logLevel !== "silent") {
-            console.warn("[ig-chat-api] Token validation warning:", error.response?.data?.error?.message || error.message);
-            console.log("[ig-chat-api] Proceeding with provided credentials...");
+        const errorMsg = error.response?.data?.error?.message || error.message;
+        if (error.response?.status === 400 || error.response?.status === 401) {
+            console.error("[ig-chat-api] ✗ Invalid access token:", errorMsg);
+            callback(new Error(`Invalid access token: ${errorMsg}`));
+        } else {
+            if (globalOptions.logLevel !== "silent") {
+                console.warn("[ig-chat-api] Token validation warning:", errorMsg);
+                console.log("[ig-chat-api] Proceeding with provided credentials...");
+            }
+            const api = buildAPI(ctx);
+            callback(null, api);
         }
-        const api = buildAPI(ctx);
-        callback(null, api);
     });
     
     return returnPromise;
