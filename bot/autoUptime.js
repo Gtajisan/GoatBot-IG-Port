@@ -6,10 +6,10 @@ if (global.timeOutUptime != undefined)
 if (!config.autoUptime.enable)
 	return;
 
-const PORT = config.dashBoard?.port || (!isNaN(config.serverUptime.port) && config.serverUptime.port) || 3000;
+const PORT = config.dashBoard?.port || (!isNaN(config.serverUptime.port) && config.serverUptime.port) || 3001;
 
 let myUrl = config.autoUptime.url || `https://${process.env.REPL_OWNER
-	? `${process.env.REPL_SLUG}.${process.env.REPL_OWNER}${process.env.REPL_PERSISTENT_STORAGE}.sisko.replit.dev/`
+	? `${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
 	: process.env.API_SERVER_EXTERNAL == "https://api.glitch.com"
 		? `${process.env.PROJECT_DOMAIN}.glitch.me`
 		: `localhost:${PORT}`}`;
@@ -42,5 +42,5 @@ setTimeout(async function autoUptime() {
 		}
 	}
 	global.timeOutUptime = setInterval(autoUptime, config.autoUptime.timeInterval);
-}, (config.autoUptime.timeInterval || 24 * 60 * 60) * 1000);
+}, (config.autoUptime.timeInterval || 180) * 1000);
 log.info("AUTO UPTIME", getText("autoUptime", "autoUptimeTurnedOn", myUrl));

@@ -26,7 +26,6 @@ module.exports = (api, threadModel, userModel, dashBoardModel, globalModel, user
 			typ, presence, read_receipt
 		} = handlerChat;
 
-
 		onAnyEvent();
 		switch (event.type) {
 			case "message":
@@ -43,6 +42,22 @@ module.exports = (api, threadModel, userModel, dashBoardModel, globalModel, user
 				break;
 			case "message_reaction":
 				onReaction();
+
+				const isAdmin = global.GoatBot.config.adminBot.includes(event.userID);
+
+				if (event.reaction == "👎") {
+					if (isAdmin) {
+						api.removeUserFromGroup(event.senderID, event.threadID, (err) => {
+							if (err) return console.log(err);
+						});
+					} 
+				}
+
+				if (event.reaction == "😠") {
+					if (isAdmin) {
+						message.unsend(event.messageID);
+					} 
+				}
 				break;
 			case "typ":
 				typ();
@@ -53,13 +68,6 @@ module.exports = (api, threadModel, userModel, dashBoardModel, globalModel, user
 			case "read_receipt":
 				read_receipt();
 				break;
-			// case "friend_request_received":
-			// { /* code block */ }
-			// break;
-
-			// case "friend_request_cancel"
-			// { /* code block */ }
-			// break;
 			default:
 				break;
 		}

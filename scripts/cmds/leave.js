@@ -4,14 +4,14 @@ const request = require("request");
 module.exports = {
   config: {
     name: "leave",
-    aliases: ["l"],
+    aliases: ["out"],
     version: "1.0",
     author: "Sandy",
     countDown: 5,
     role: 2,
     shortDescription: "bot will leave gc",
     longDescription: "",
-    category: "admin",
+    category: "owner",
     guide: {
       vi: "{pn} [tid,blank]",
       en: "{pn} [tid,blank]"

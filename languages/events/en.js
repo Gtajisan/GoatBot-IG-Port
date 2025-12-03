@@ -36,16 +36,5 @@ module.exports = {
 			multiple1: "you",
 			multiple2: "you guys"
 		}
-	},
-	autorestart: {},
-	key: "restarting",
-	onLoad: {},
-	onMessage: {},
-	onReply: {},
-	onStart: {},
-	onUnsend: {},
-	onEvent: {},
-	onChat: {},
-	onGlobal: {},
-	onReaction: {
-		},
+	}
+};

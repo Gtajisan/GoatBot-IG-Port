@@ -1,12 +1,26 @@
 <img src="https://i.ibb.co/RQ28H2p/banner.png" alt="banner">
-<h1 align="center"><img src="./dashboard/images/logo-non-bg.png" width="22px"> Goat Bot - Bot Chat Messenger</h1>
+<h1 align="center"><img src="./dashboard/images/logo-non-bg.png" width="22px"> Goat Bot V2- Chatbot Messenger</h1>
+
+
+## Introduction
+
+### 🆕 **Latest Updates - v2.0 Refactor**
+- **🔧 Refactor(goat)**: Major code cleanup and optimization
+- **📧 Gmail OAuth Removal**: Removed deprecated Gmail OAuth mail setup dependencies
+- **🧹 Dependencies Cleanup**: Deleted Google API and nodemailer dependencies for mail sending
+- **🛡️ Better Error Handling**: Added error handling for failure to fetch the latest version
+- **📁 Script Simplification**: Simplified login script requiring based on environment
+- **🎯 Performance**: Improved overall bot performance and reduced memory footprint
+
+#### Join us in [Messenger Group](https://m.me/j/AbZ6Bj-uS3npg7di/)🍪
+###### If you encounter any issues or difficulties, don't hesitate to reach out and ask for assistance here. Our team is here to help you with any problems you may face.
+
+- If you encounter any issues or have questions related to this project, please don't hesitate to reach out to us on messenger. we're here to assist you!
+
 <p align="center">
-<img src="./snake.svg" width="500">
-<img src="https://user-images.githubusercontent.com/74038190/212284115-f47cd8ff-2ffb-4b04-b5bf-4d1c14c0247f.gif" width="500">
-<br><br>
-<img src="https://user-images.githubusercontent.com/74038190/219925470-37670a3b-c3e2-4af7-b468-673c6dd99d16.png" width="200" />
-
-
+		<img align="center" alt="PNG" src="https://i.postimg.cc/Y2XShSm8/86678c65-896a-47fe-8256-3e8e76dd26d6.jpg"/>
+<h1 align='center'>
+	
 - [📝 **Note**](#-note)
 - [🚧 **Requirement**](#-requirement)
 - [📝 **Tutorial**](#-tutorial)
@@ -36,7 +50,7 @@
 Tutorial has been uploaded on YouTube
 - For mobile phone: https://www.youtube.com/watch?v=grVeZ76HlgA
 - For vps/windows: https://www.youtube.com/watch?v=uCbSYNQNEwY
-
+  
 Summary instructions:
 - See [here](https://github.com/ntkhang03/Goat-Bot-V2/blob/main/STEP_INSTALL.md)
 
@@ -55,7 +69,8 @@ Tutorial has been uploaded on YouTube
 If you have major coding issues with this bot, please join and ask for help.
 - https://discord.com/invite/DbyGwmkpVY (recommended)
 - https://www.facebook.com/groups/goatbot
-- https://m.me/j/Abbq0B-nmkGJUl2C
+- https://www.facebook.com/groups/goatbot/permalink/493150412403231
+- https://m.me/j/AbYrIGusyc0M402z
 - ~~https://t.me/gatbottt~~ (no longer supported)
 - ***Please do not inbox me, I do not respond to private messages, any questions please join the chat group for answers. ThankThanks!***
 
@@ -121,43 +136,43 @@ If you have major coding issues with this bot, please join and ask for help.
 - ### Bot
 <details>
 	<summary>
-		Rank system
+ 		Rank system
 	</summary>
 
-	- Rank card:
-	<p><img src="https://i.ibb.co/d0JDJxF/rank.png" width="399px"></p>
+  - Rank card:
+  <p><img src="https://i.ibb.co/d0JDJxF/rank.png" width="399px"></p>
 
-	- Rankup notification:
-	<p><img src="https://i.ibb.co/WgZzthH/rankup.png" width="399px"></p>
+  - Rankup notification:
+  <p><img src="https://i.ibb.co/WgZzthH/rankup.png" width="399px"></p>
 
-	- Custom rank card:
-	<p><img src="https://i.ibb.co/hLTThLW/customrankcard.png" width="399px"></p>
+  - Custom rank card:
+  <p><img src="https://i.ibb.co/hLTThLW/customrankcard.png" width="399px"></p>
 </details>
 
 <details>
 	<summary>
-		Weather
+ 		Weather
 	</summary>
 	<p><img src="https://i.ibb.co/2FwWVLv/weather.png" width="399px"></p>
 </details>
 
 <details>
 	<summary>
-		Auto send notification when have user join or leave box chat (you can custom message)
+ 		Auto send notification when have user join or leave box chat (you can custom message)
 	</summary>
 	<p><img src="https://i.ibb.co/Jsb5Jxf/wcgb.png" width="399px"></p>
 </details>
 
 <details>
 	<summary>
-		Openjourney
+ 		Openjourney
 	</summary>
 	<p><img src="https://i.ibb.co/XJfwj1X/Screenshot-2023-05-09-22-43-58-630-com-facebook-orca.jpg" width="399px"></p>
 </details>
 
 <details>
 	<summary>
-		GPT
+ 		GPT
 	</summary>
 	<p><img src="https://i.ibb.co/D4wRbM3/Screenshot-2023-05-09-22-47-48-037-com-facebook-orca.jpg" width="399px"></p>
 	<p><img src="https://i.ibb.co/z8HqPkH/Screenshot-2023-05-09-22-47-53-737-com-facebook-orca.jpg" width="399px"></p>
@@ -169,47 +184,45 @@ If you have major coding issues with this bot, please join and ask for help.
 - ### Dashboard
 <details>
 	<summary>
-		Home:
+ 		Home:
 	</summary>
-	<p><img src="https://i.ibb.co/HV91MbH/image.png" width="399px"></p>
-	<p><img src="https://i.ibb.co/DRr97R9/image.png" width="399px"></p>
+	<p><img src="https://i.ibb.co/xzv6s2j/dbHome.png" width="399px"></p>
 </details>
 
 <details>
 	<summary>
-		Stats:
+ 		Stats:
 	</summary>
-	<p><img src="https://i.ibb.co/NyCMYxS/image.png" width="399px"></p>
+	<p><img src="https://i.ibb.co/zVZv9LF/dbStats.png" width="399px"></p>
 </details>
 
 <details>
 	<summary>
-		Login/Register:
+ 		Login/Register:
 	</summary>
-	<p><img src="https://i.ibb.co/2Z2L6p4/image.png" width="399px"></p>
-	<p><img src="https://i.ibb.co/KF1ftGw/image.png" width="399px"></p>
+	<p><img src="https://i.ibb.co/SK61MRx/dbLogin.png" width="399px"></p>
+	<p><img src="https://i.ibb.co/1rchbb1/db-Register.png" width="399px"></p>
 </details>
 
 <details>
 	<summary>
-		Dashboard Thread:
+ 		Dashboard Thread:
 	</summary>
-	<p><img src="https://i.ibb.co/tHNqtyy/image.png" width="399px"></p>
+	<p><img src="https://i.ibb.co/NK5yYwx/dbThread.png" width="399px"></p>
 </details>
 
 <details>
 	<summary>
-		Custom on/off:
+ 		Custom on/off:
 	</summary>
-	<p><img src="https://i.ibb.co/McDRhmX/image.png" width="399px"></p>
+	<p><img src="https://i.ibb.co/mJqsP2L/dbCustom.png" width="399px"></p>
 </details>
 
 <details>
 	<summary>
-		Custom welcome message (similar with leave, rankup (coming soon), custom command (coming soon))
+ 		Custom welcome message (similar with leave, rankup (coming soon), custom command (coming soon))
 	</summary>
-	<p><img src="https://i.ibb.co/6ZrQqc1/image.png" width="399px"></p>
-	<p><img src="https://i.ibb.co/G53JsXm/image.png" width="399px"></p>
+	<p><img src="https://i.ibb.co/3SyfQkz/db-Custom-Welcome.png" width="399px"></p>
 </details>
 
 ## ✨ **Copyright (C)**
@@ -232,3 +245,4 @@ If you have major coding issues with this bot, please join and ask for help.
 - Don't claim my source code as your own
 - Do not monetize my source code (such as: buy and sell commands, buy and sell bots, call for donations, etc.)
 - Don't remove/edit my credits (author name) in my source code
+

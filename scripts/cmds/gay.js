@@ -1,116 +1,61 @@
 const DIG = require("discord-image-generation");
-const fs = require("fs-extra");
+const axios = require('axios');
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 
 module.exports = {
-	config: {
-		name: "gay",
-		version: "1.0",
-		author: "@tas33n",
-		countDown: 1,
-		role: 0,
-		shortDescription: "find gay",
-		longDescription: "",
-		category: "box chat",
-		guide: "{pn} {{[on | off]}}",
-		envConfig: {
-			deltaNext: 5
-		}
-	},
+    config: {
+        name: "gay",
+        aliases: ["gay"],
+        version: "1.2",
+        author: "Rômeo",
+        countDown: 5,
+        role: 0,
+        shortDescription: "rainbowify someone's avatar",
+        longDescription: "",
+        category: "fun",
+        guide: "{pn} [@mention]"
+    },
 
-	langs: {
-		vi: {
-			noTag: "Bạn phải tag người bạn muốn tát"
-		},
-		en: {
-			noTag: "You must tag the person you want to "
-		}
-	},
+    onStart: async function ({ message, event, args }) {
+        const mentions = Object.keys(event.mentions);
+        const senderID = event.senderID;
 
-	onStart: async function ({ event, message, usersData, args, getLang }) 
-	{
+        const targetID = event.type === "message_reply"
+            ? event.messageReply.senderID
+            : mentions.length > 0
+                ? mentions[0]
+                : senderID;
 
-		let mention = Object.keys(event.mentions)
-		let uid;
+        const targetName = event.type === "message_reply"
+            ? event.messageReply.senderName
+            : mentions.length > 0
+                ? Object.values(event.mentions)[0]
+                : "You";
 
-		// const img = await new DIG.Gay().getImage(url);
+        const pth = await makeGay(targetID);
 
+        await message.reply({
+            body: `Hey 🏳️‍🌈 `,
+            attachment: fs.createReadStream(pth)
+        });
 
-		if(event.type == "message_reply"){
-		uid = event.messageReply.senderID
-		} else{
-			if (mention[0]){
-				uid = mention[0]
-			}else{
-				console.log(" jsjsj")
-				uid = event.senderID}
-		}
-
-let url = await usersData.getAvatarUrl(uid)
-let avt = await new DIG.Gay().getImage(url)
-
-
-	// 	message.reply({
-	// 		body:"",
-	// 		attachment: await global.utils.getStreamFromURL(avt)
-	// })
-			const pathSave = `${__dirname}/tmp/gay.png`;
-	fs.writeFileSync(pathSave, Buffer.from(avt));
-		let body = "look.... i found a gay"
-		if(!mention[0]) body="Baka you gay\nforgot to reply or mention someone"
-		message.reply({body:body,
-attachment: fs.createReadStream(pathSave)
-		}, () => fs.unlinkSync(pathSave));
-
-
-	}
+        try { fs.unlinkSync(pth); } catch (e) { /* ignore */ }
+    }
 };
 
+async function getAvatarBuffer(uid) {
+    const url = `https://graph.facebook.com/${uid}/picture?width=512&height=512&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`;
+    const response = await axios.get(url, { responseType: 'arraybuffer' });
+    return Buffer.from(response.data, 'binary');
+}
 
-
-
-
-
-
-
-
-// 	onStart: async function ({ message, event, usersData, threadsData, args }) {
-
-
-
-
-// 		if(event.type == "message_reply"){
-//       avt = await usersData.getAvatarUrl(event.messageReply.senderID)
-//     } else{
-//       if (!uid2){avt =  await usersData.getAvatarUrl(uid1)
-//               } else{avt = await usersData.getAvatarUrl(uid2)}}
-
-
-// 		message.reply({body:"Look.... I found a gay",
-// attachment: fs.createReadStream(pathSave)
-// 		}, () => fs.unlinkSync(pathSave));
-
-
-
-
-
-// message.send({body:"Look.... I found a gay",
-// attachment: fs.createReadStream(pathSave)
-// 		}, () => fs.unlinkSync(pathSave));
-
-// st fs = require("fs-extra");
-// let url = await usersData.getAvatarUrl(event.messageReply.senderID)
-// // const img = await new DIG.Gay().getImage(url);
-		// const pathSave = `${__dirname}/tmp/gay.png`;
-		// fs.writeFileSync(pathSave, Buffer.from(avt));
-
-// // message.send({body:"Look.... I found a gay",
-// // attachment: fs.createReadStream(pathSave)
-// // 		}, () => fs.unlinkSync(pathSave));
-
-
-// 	}
-
-
-
-
-// }
+async function makeGay(uid) {
+    const avatar = await getAvatarBuffer(uid);
+    const img = await new DIG.Gay().getImage(avatar);
+    const tmpDir = os.tmpdir();
+    const pth = path.join(tmpDir, `gay_${Date.now()}_${Math.floor(Math.random()*10000)}.png`);
+    fs.writeFileSync(pth, img);
+    return pth;
+}
