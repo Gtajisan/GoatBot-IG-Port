@@ -4,16 +4,22 @@
   <a href="https://ibb.co.com/C5L70jjH">
     <img src="https://i.ibb.co.com/C5L70jjH/Picsart-25-12-07-23-14-49-072.jpg" alt="GoatBot Instagram Port Banner" width="100%">
   </a>
-</div>
 
   <h3>🤖 Instagram Chat Bot - Official Port of GoatBot V2</h3>
 
-  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-  [![Node Version](https://img.shields.io/badge/node-%3E%3D16.0.0-brightgreen)](https://nodejs.org)
-  [![Instagram](https://img.shields.io/badge/Platform-Instagram-E4405F?logo=instagram)](https://instagram.com)
+  <a href="https://opensource.org/licenses/MIT">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT License">
+  </a>
+  <a href="https://nodejs.org">
+    <img src="https://img.shields.io/badge/node-%3E%3D16.0.0-brightgreen" alt="Node Version">
+  </a>
+  <a href="https://instagram.com">
+    <img src="https://img.shields.io/badge/Platform-Instagram-E4405F?logo=instagram" alt="Instagram Platform">
+  </a>
 </div>
 
 ---
+
 
 ## 📖 Introduction
 
