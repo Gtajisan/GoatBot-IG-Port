@@ -1,5 +1,14 @@
 "use strict";
 
+/**
+ * Instagram Chat API (ig-chat-api)
+ * 
+ * @author Gtajisan
+ * @description Instagram Chat API ported from fb-chat-api with Instagram logic
+ * @based-on fb-chat-api by NTKhang and DongDev
+ * @credit GoatBot V2 Instagram Port
+ */
+
 const fs = require("fs-extra");
 const path = require("path");
 const axios = require("axios");
@@ -147,6 +156,20 @@ function buildAPI(ctx) {
         }
         if (callback) callback();
     };
+    
+    const srcPath = path.join(__dirname, 'src');
+    if (fs.existsSync(srcPath)) {
+        fs.readdirSync(srcPath)
+            .filter(v => v.endsWith('.js'))
+            .forEach(v => {
+                const funcName = v.replace('.js', '');
+                if (!api[funcName]) {
+                    try {
+                        api[funcName] = require(`./src/${v}`)(ctx, api);
+                    } catch (e) {}
+                }
+            });
+    }
     
     return api;
 }

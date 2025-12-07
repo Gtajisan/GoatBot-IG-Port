@@ -4,8 +4,10 @@
  * This is the Instagram port of GoatBot V2
  * Drop-in replacement for the original Goat.js that works with Instagram
  * 
- * @author GoatBot-Instagram Port
+ * @author Gtajisan
+ * @developer Gtajisan
  * @based-on NTKhang's GoatBot V2 (Team Calyx)
+ * @credit DongDev, NTKhang, Team Calyx
  */
 
 process.on('unhandledRejection', error => console.log(error));
@@ -206,6 +208,7 @@ console.log("║    ╚██████╔╝╚██████╔╝██
 console.log("║     ╚═════╝  ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚═════╝  ╚═════╝    ╚═╝       ║");
 console.log("║                                                                      ║");
 console.log("║              GoatBot V2 - Instagram Port                            ║");
+console.log("║                   Developer: Gtajisan                               ║");
 console.log("║         Based on NTKhang's GoatBot V2 (Team Calyx)                  ║");
 console.log("╚══════════════════════════════════════════════════════════╝");
 console.log("\n");

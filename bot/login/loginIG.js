@@ -1,6 +1,13 @@
 "use strict";
 
-process.stdout.write("\x1b]2;GoatBot V2 - Instagram Port\x1b\x5c");
+/**
+ * Instagram Login Handler
+ * @author Gtajisan
+ * @developer Gtajisan
+ * @based-on NTKhang's GoatBot V2 (Team Calyx)
+ */
+
+process.stdout.write("\x1b]2;GoatBot V2 - Instagram Port by Gtajisan\x1b\x5c");
 
 const fs = require("fs-extra");
 const path = require("path");
