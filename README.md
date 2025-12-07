@@ -1,8 +1,7 @@
 # GoatBot-IG-Port
-
 <div align="center">
-  <a href="https://ibb.co.com/C5L70jjH">
-    <img src="https://i.ibb.co.com/C5L70jjH/Picsart-25-12-07-23-14-49-072.jpg" alt="GoatBot Instagram Port Banner" width="100%">
+  <a href="https://postimg.cc/yJxS6Pz1">
+    <img src="https://i.postimg.cc/43bv5LL9/Picsart-25-12-07-23-14-49-072.jpg" alt="GoatBot Instagram Port Banner" width="100%">
   </a>
 
   <h3>🤖 Instagram Chat Bot - Official Port of GoatBot V2</h3>
@@ -19,6 +18,7 @@
 </div>
 
 ---
+
 
 
 ## 📖 Introduction
