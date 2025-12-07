@@ -6,8 +6,24 @@ channel = "stable-24_05"
 packages = ["freetype", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "openjpeg", "tcl", "tk", "zlib"]
 
 [deployment]
-run = ["bash", "main.sh"]
+run = ["sh", "-c", "node index.js"]
 deploymentTarget = "cloudrun"
 
 [agent]
 expertMode = true
+
+[workflows]
+runButton = "Start Bot"
+
+[[workflows.workflow]]
+name = "Start Bot"
+author = 29092274
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm install"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node index.js"
