@@ -1,7 +1,7 @@
 # GoatBot-IG-Port
 
 <div align="center">
-  <img src="https://i.ibb.co/RQ28H2p/banner.png" alt="GoatBot Instagram Port Banner" width="100%">
+  <img src="https://ibb.co.com/C5L70jjH" alt="GoatBot Instagram Port Banner" width="100%">
 
   <h3>🤖 Instagram Chat Bot - Official Port of GoatBot V2</h3>
 
@@ -82,6 +82,7 @@ npm install
 
 ### Step 3: Create Environment File
 ***add cookie arrya using Cookie editor add into account.txt***
+```
 npm start 
 
 ```
@@ -91,9 +92,8 @@ npm start
 BOT_PREFIX=!
 BOT_ADMIN_IDS=instagram_user_id_1,instagram_user_id_2
 ```
-
 ### Step 5: Configure Bot Settings
-
+```
 Edit `config.json`:
 
 ```json
