@@ -1,0 +1,28 @@
+
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+
+# Session data
+session.json
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Replit
+.replit
+replit.nix
+.upm/
