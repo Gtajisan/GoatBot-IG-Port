@@ -81,29 +81,13 @@ npm install
 ```
 
 ### Step 3: Create Environment File
+***add cookie arrya using Cookie editor add into account.txt***
+npm start 
 
-Create a `.env` file in the root directory:
-
-```bash
-cp .env.example .env
 ```
 
-### Step 4: Configure Environment Variables
-
-Edit `.env` and add your Instagram credentials:
-
-```env
-# Instagram Graph API Configuration (Recommended)
-INSTAGRAM_ACCESS_TOKEN=your_page_access_token_here
-INSTAGRAM_PAGE_ID=your_instagram_business_account_id
-INSTAGRAM_VERIFY_TOKEN=goatbot_ig_verify_token
-PORT=5000
-
-# OR use username/password (Legacy method)
-IG_USERNAME=your_instagram_username
-IG_PASSWORD=your_instagram_password
-
-# Bot Configuration
+### # Bot Configuration
+```
 BOT_PREFIX=!
 BOT_ADMIN_IDS=instagram_user_id_1,instagram_user_id_2
 ```
@@ -213,11 +197,10 @@ Admin users can:
    - Verify token: Same as `INSTAGRAM_VERIFY_TOKEN` in `.env`
    - Subscribe to: `messages`, `messaging_postbacks`
 
-5. **Add to .env**
-   ```env
-   INSTAGRAM_ACCESS_TOKEN=your_token
-   INSTAGRAM_PAGE_ID=your_page_id
-   INSTAGRAM_VERIFY_TOKEN=your_verify_token
+5. **Add to .account.txt**
+   ```account.txt
+   your_token
+   
    ```
 
 ### Method 2: Session File (Legacy)
