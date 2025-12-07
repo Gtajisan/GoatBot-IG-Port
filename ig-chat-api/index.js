@@ -1,31 +1,27 @@
 "use strict";
 
-/**
- * ig-chat-api - Instagram Chat API
- * 
- * FCA-compatible wrapper for Instagram Messaging API (Graph API)
- * Drop-in replacement for fb-chat-api / fca-unofficial
- * 
- * Usage:
- *   const login = require("ig-chat-api");
- *   login({ accessToken, igUserID }, (err, api) => {
- *     api.listen((err, event) => { ... });
- *     api.sendMessage("Hello!", threadID);
- *   });
- */
+const fs = require("fs-extra");
+const path = require("path");
+const axios = require("axios");
+const { CookieJar } = require("tough-cookie");
+const { wrapper } = require("axios-cookiejar-support");
+const EventEmitter = require("events");
 
-const sendMessage = require("./api/sendMessage");
-const listen = require("./api/listen");
-const getUserInfo = require("./api/getUserInfo");
-const getThreadInfo = require("./api/getThreadInfo");
-const getThreadList = require("./api/getThreadList");
-const markAsRead = require("./api/markAsRead");
-const sendTypingIndicator = require("./api/sendTypingIndicator");
-const setMessageReaction = require("./api/setMessageReaction");
+const sendMessage = require("./src/sendMessage");
+const listenMqtt = require("./src/listenMqtt");
+const getUserInfo = require("./src/getUserInfo");
+const getThreadInfo = require("./src/getThreadInfo");
+const getThreadList = require("./src/getThreadList");
+const markAsRead = require("./src/markAsRead");
+const sendTypingIndicator = require("./src/sendTypingIndicator");
+const setMessageReaction = require("./src/setMessageReaction");
+const getCurrentUserID = require("./src/getCurrentUserID");
+const getThreadHistory = require("./src/getThreadHistory");
+const unsendMessage = require("./src/unsendMessage");
 
 const Boolean_Options = [
     "listenEvents",
-    "selfListen",
+    "selfListen", 
     "autoMarkDelivery",
     "autoMarkRead",
     "autoReconnect",
@@ -41,18 +37,11 @@ function setOptions(globalOptions, options) {
                 case "logLevel":
                     globalOptions.logLevel = options.logLevel;
                     break;
-                case "pageID":
-                case "igUserID":
-                    globalOptions.pageID = (options.pageID || options.igUserID).toString();
+                case "forceLogin":
+                    globalOptions.forceLogin = options.forceLogin;
                     break;
-                case "accessToken":
-                    globalOptions.accessToken = options.accessToken;
-                    break;
-                case "verifyToken":
-                    globalOptions.verifyToken = options.verifyToken;
-                    break;
-                case "webhookPort":
-                    globalOptions.webhookPort = parseInt(options.webhookPort);
+                case "userAgent":
+                    globalOptions.userAgent = options.userAgent;
                     break;
                 default:
                     globalOptions[key] = options[key];
@@ -62,78 +51,80 @@ function setOptions(globalOptions, options) {
     });
 }
 
+function getHeaders(ctx) {
+    return {
+        "User-Agent": ctx.globalOptions.userAgent || "Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+        "Accept": "*/*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "X-IG-App-ID": "936619743392459",
+        "X-ASBD-ID": "129477",
+        "X-IG-WWW-Claim": ctx.wwwClaim || "0",
+        "X-Requested-With": "XMLHttpRequest",
+        "Origin": "https://www.instagram.com",
+        "Referer": "https://www.instagram.com/direct/inbox/",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+        "X-CSRFToken": ctx.csrfToken || ""
+    };
+}
+
 function buildAPI(ctx) {
-    const api = {};
+    const api = new EventEmitter();
     
     api.setOptions = (options) => setOptions(ctx.globalOptions, options);
     
-    api.getAppState = () => ({
-        accessToken: ctx.accessToken,
-        pageID: ctx.pageID,
-        igUserID: ctx.pageID,
-        verifyToken: ctx.verifyToken
-    });
+    api.getAppState = () => ctx.appState;
     
-    api.getCurrentUserID = () => ctx.pageID;
-    api.getUserID = () => ctx.pageID;
+    api.getCurrentUserID = getCurrentUserID(ctx);
+    api.getUserID = () => ctx.userID;
     
-    api.sendMessage = sendMessage(ctx);
-    api.listen = listen(ctx, api);
-    api.listenMqtt = api.listen;
+    api.sendMessage = sendMessage(ctx, api);
+    api.listenMqtt = listenMqtt(ctx, api);
+    api.listen = api.listenMqtt;
     api.getUserInfo = getUserInfo(ctx);
     api.getThreadInfo = getThreadInfo(ctx);
     api.getThreadList = getThreadList(ctx);
+    api.getThreadHistory = getThreadHistory(ctx);
     api.markAsRead = markAsRead(ctx);
     api.markAsDelivered = api.markAsRead;
     api.sendTypingIndicator = sendTypingIndicator(ctx);
     api.setMessageReaction = setMessageReaction(ctx);
-    
-    api.unsendMessage = (messageID, callback) => {
-        console.warn("[ig-chat-api] unsendMessage not supported on Instagram");
-        if (callback) callback(null);
-        return Promise.resolve();
-    };
-    
+    api.unsendMessage = unsendMessage(ctx);
     api.deleteMessage = api.unsendMessage;
     
     api.changeNickname = (nickname, threadID, participantID, callback) => {
-        console.warn("[ig-chat-api] changeNickname not supported on Instagram");
         if (callback) callback(null);
         return Promise.resolve();
     };
     
     api.changeThreadColor = (color, threadID, callback) => {
-        console.warn("[ig-chat-api] changeThreadColor not supported on Instagram");
         if (callback) callback(null);
         return Promise.resolve();
     };
     
     api.changeThreadEmoji = (emoji, threadID, callback) => {
-        console.warn("[ig-chat-api] changeThreadEmoji not supported on Instagram");
         if (callback) callback(null);
         return Promise.resolve();
     };
     
     api.setTitle = (newTitle, threadID, callback) => {
-        console.warn("[ig-chat-api] setTitle not supported on Instagram DMs");
         if (callback) callback(null);
         return Promise.resolve();
     };
     
     api.addUserToGroup = (userID, threadID, callback) => {
-        console.warn("[ig-chat-api] addUserToGroup not supported on Instagram");
         if (callback) callback(null);
         return Promise.resolve();
     };
     
     api.removeUserFromGroup = (userID, threadID, callback) => {
-        console.warn("[ig-chat-api] removeUserFromGroup not supported on Instagram");
         if (callback) callback(null);
         return Promise.resolve();
     };
     
     api.changeAdminStatus = (threadID, adminIDs, adminStatus, callback) => {
-        console.warn("[ig-chat-api] changeAdminStatus not supported on Instagram");
         if (callback) callback(null);
         return Promise.resolve();
     };
@@ -141,15 +132,73 @@ function buildAPI(ctx) {
     api.logout = (callback) => {
         ctx.loggedIn = false;
         if (ctx.stopListening) ctx.stopListening();
-        console.log("[ig-chat-api] Logged out");
         if (callback) callback(null);
         return Promise.resolve();
     };
     
-    api.handleWebhook = null;
-    api.verifyWebhook = null;
+    api.getHeaders = () => getHeaders(ctx);
+    api.httpGet = (url, jar) => ctx.axios.get(url);
+    api.httpPost = (url, form, jar) => ctx.axios.post(url, form);
+    
+    api.stopListenMqtt = (callback) => {
+        if (ctx.mqttClient) {
+            ctx.mqttClient.end();
+            ctx.mqttClient = null;
+        }
+        if (callback) callback();
+    };
     
     return api;
+}
+
+function parseCookies(cookieData) {
+    let cookies = [];
+    
+    if (typeof cookieData === "string") {
+        if (cookieData.trim().startsWith("[")) {
+            try {
+                cookies = JSON.parse(cookieData);
+            } catch (e) {
+                cookies = cookieData.split(";").map(c => {
+                    const [key, ...valueParts] = c.trim().split("=");
+                    return {
+                        key: key?.trim(),
+                        value: valueParts.join("=")?.trim(),
+                        domain: "instagram.com",
+                        path: "/",
+                        hostOnly: false,
+                        creation: new Date().toISOString(),
+                        lastAccessed: new Date().toISOString()
+                    };
+                }).filter(c => c.key && c.value);
+            }
+        } else {
+            cookies = cookieData.split(";").map(c => {
+                const [key, ...valueParts] = c.trim().split("=");
+                return {
+                    key: key?.trim(),
+                    value: valueParts.join("=")?.trim(),
+                    domain: "instagram.com",
+                    path: "/",
+                    hostOnly: false,
+                    creation: new Date().toISOString(),
+                    lastAccessed: new Date().toISOString()
+                };
+            }).filter(c => c.key && c.value);
+        }
+    } else if (Array.isArray(cookieData)) {
+        cookies = cookieData.map(c => ({
+            key: c.key || c.name,
+            value: c.value,
+            domain: c.domain || "instagram.com",
+            path: c.path || "/",
+            hostOnly: c.hostOnly || false,
+            creation: c.creation || new Date().toISOString(),
+            lastAccessed: c.lastAccessed || new Date().toISOString()
+        }));
+    }
+    
+    return cookies.filter(c => c.key && c.value);
 }
 
 function login(loginData, options, callback) {
@@ -166,7 +215,8 @@ function login(loginData, options, callback) {
         autoReconnect: true,
         updatePresence: false,
         logLevel: "info",
-        webhookPort: 5000
+        forceLogin: true,
+        userAgent: "Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
     };
     
     setOptions(globalOptions, options);
@@ -184,88 +234,123 @@ function login(loginData, options, callback) {
         };
     }
     
-    const accessToken = loginData.accessToken || 
-                        loginData.appState?.accessToken || 
-                        process.env.INSTAGRAM_ACCESS_TOKEN ||
-                        process.env.IG_ACCESS_TOKEN;
+    const appState = loginData.appState || loginData;
+    const cookies = parseCookies(appState);
     
-    const pageID = loginData.pageID || 
-                   loginData.igUserID ||
-                   loginData.appState?.pageID ||
-                   loginData.appState?.igUserID ||
-                   process.env.INSTAGRAM_PAGE_ID ||
-                   process.env.IG_USER_ID;
-    
-    const verifyToken = loginData.verifyToken || 
-                        loginData.appState?.verifyToken ||
-                        process.env.INSTAGRAM_VERIFY_TOKEN ||
-                        process.env.IG_VERIFY_TOKEN ||
-                        "goatbot_ig_verify";
-    
-    if (!accessToken) {
-        const error = new Error(
-            "Access token is required. Set INSTAGRAM_ACCESS_TOKEN environment variable or pass accessToken in loginData."
-        );
+    if (!cookies || cookies.length === 0) {
+        const error = new Error("No valid cookies provided. Please provide Instagram cookies in account.txt");
         callback(error);
         return returnPromise;
     }
     
-    if (!pageID) {
-        const error = new Error(
-            "Instagram Page/User ID is required. Set INSTAGRAM_PAGE_ID environment variable or pass pageID/igUserID in loginData."
-        );
+    const jar = new CookieJar();
+    let csrfToken = "";
+    let sessionID = "";
+    let userID = "";
+    
+    for (const cookie of cookies) {
+        try {
+            const cookieStr = `${cookie.key}=${cookie.value}; Domain=.instagram.com; Path=/`;
+            jar.setCookieSync(cookieStr, "https://www.instagram.com/");
+            
+            if (cookie.key === "csrftoken") csrfToken = cookie.value;
+            if (cookie.key === "sessionid") sessionID = cookie.value;
+            if (cookie.key === "ds_user_id") userID = cookie.value;
+        } catch (e) {}
+    }
+    
+    if (!sessionID) {
+        const error = new Error("Missing sessionid cookie. Please ensure your Instagram cookies include 'sessionid'");
         callback(error);
         return returnPromise;
     }
+    
+    if (!userID) {
+        const error = new Error("Missing ds_user_id cookie. Please ensure your Instagram cookies include 'ds_user_id'");
+        callback(error);
+        return returnPromise;
+    }
+    
+    const axiosInstance = wrapper(axios.create({
+        jar,
+        withCredentials: true,
+        baseURL: "https://www.instagram.com",
+        timeout: 30000
+    }));
     
     const ctx = {
-        accessToken: accessToken,
-        pageID: pageID.toString(),
-        verifyToken: verifyToken,
+        userID: userID,
+        jar: jar,
+        axios: axiosInstance,
+        csrfToken: csrfToken,
+        sessionID: sessionID,
+        appState: cookies,
         globalOptions: globalOptions,
         loggedIn: true,
         clientID: Math.random().toString(36).substring(2),
-        apiVersion: "v19.0",
-        graphApiBase: "https://graph.facebook.com",
-        stopListening: null,
-        eventEmitter: null
+        wwwClaim: "0",
+        mqttClient: null,
+        stopListening: null
     };
     
-    console.log("[ig-chat-api] Initializing Instagram Chat API...");
-    console.log(`[ig-chat-api] Page ID: ${ctx.pageID}`);
-    console.log(`[ig-chat-api] API Version: ${ctx.apiVersion}`);
-    console.log(`[ig-chat-api] Webhook Port: ${ctx.globalOptions.webhookPort}`);
+    axiosInstance.defaults.headers.common = getHeaders(ctx);
     
-    const axios = require("axios");
+    console.log("[ig-chat-api] Validating Instagram session...");
     
-    // Validate token
-    axios.get(`${ctx.graphApiBase}/${ctx.apiVersion}/me`, {
-        params: {
-            access_token: ctx.accessToken,
-            fields: "id,name,instagram_business_account"
-        }
+    axiosInstance.get("/api/v1/accounts/current_user/", {
+        headers: getHeaders(ctx)
     })
     .then(response => {
-        console.log(`[ig-chat-api] ✓ Connected as: ${response.data.name || response.data.id}`);
-        if (response.data.instagram_business_account) {
-            console.log(`[ig-chat-api] ✓ Instagram Business Account linked`);
-        }
-        const api = buildAPI(ctx);
-        callback(null, api);
-    })
-    .catch(error => {
-        const errorMsg = error.response?.data?.error?.message || error.message;
-        if (error.response?.status === 400 || error.response?.status === 401) {
-            console.error("[ig-chat-api] ✗ Invalid access token:", errorMsg);
-            callback(new Error(`Invalid access token: ${errorMsg}`));
-        } else {
-            if (globalOptions.logLevel !== "silent") {
-                console.warn("[ig-chat-api] Token validation warning:", errorMsg);
-                console.log("[ig-chat-api] Proceeding with provided credentials...");
-            }
+        if (response.data && response.data.user) {
+            const user = response.data.user;
+            console.log(`[ig-chat-api] ✓ Logged in as: ${user.username} (ID: ${user.pk})`);
+            ctx.userID = user.pk.toString();
+            ctx.username = user.username;
             const api = buildAPI(ctx);
             callback(null, api);
+        } else {
+            throw new Error("Invalid session");
         }
+    })
+    .catch(error => {
+        console.log("[ig-chat-api] Session validation via API failed, trying web endpoint...");
+        
+        axiosInstance.get("/", {
+            headers: {
+                ...getHeaders(ctx),
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+            }
+        })
+        .then(response => {
+            const html = response.data;
+            
+            const csrfMatch = html.match(/"csrf_token":"([^"]+)"/);
+            if (csrfMatch) {
+                ctx.csrfToken = csrfMatch[1];
+            }
+            
+            const userMatch = html.match(/"username":"([^"]+)"/);
+            if (userMatch) {
+                ctx.username = userMatch[1];
+            }
+            
+            if (ctx.userID) {
+                console.log(`[ig-chat-api] ✓ Session validated for user ID: ${ctx.userID}`);
+                if (ctx.username) {
+                    console.log(`[ig-chat-api] ✓ Username: ${ctx.username}`);
+                }
+                const api = buildAPI(ctx);
+                callback(null, api);
+            } else {
+                const error = new Error("Could not validate Instagram session. Please check your cookies.");
+                callback(error);
+            }
+        })
+        .catch(err => {
+            console.log("[ig-chat-api] Proceeding with provided credentials...");
+            const api = buildAPI(ctx);
+            callback(null, api);
+        });
     });
     
     return returnPromise;

@@ -1,240 +1,213 @@
-
 /**
  * InstagramGoat.js - GoatBot V2 for Instagram
  * 
- * This is the Instagram version of GoatBot using ig-chat-api
+ * This is the Instagram port of GoatBot V2
  * Drop-in replacement for the original Goat.js that works with Instagram
  * 
- * @author GoatBot-Instagram Migration
- * @based-on NTKhang's GoatBot V2
+ * @author GoatBot-Instagram Port
+ * @based-on NTKhang's GoatBot V2 (Team Calyx)
  */
 
-process.on("unhandledRejection", error => console.log(error));
-process.on("uncaughtException", error => console.log(error));
+process.on('unhandledRejection', error => console.log(error));
+process.on('uncaughtException', error => console.log(error));
 
-const fs = require("fs-extra");
-const path = require("path");
 const axios = require("axios");
+const fs = require("fs-extra");
+const { execSync } = require('child_process');
+const path = require("path");
 
 process.env.BLUEBIRD_W_FORGOTTEN_RETURN = 0;
 
-const log = {
-    info: (head, msg) => console.log(`[${head}] ${msg}`),
-    error: (head, msg) => console.error(`[${head}] ${msg}`),
-    warn: (head, msg) => console.warn(`[${head}] ${msg}`),
-    success: (head, msg) => console.log(`[${head}] ✓ ${msg}`)
-};
-
-const dirConfig = path.normalize(`${__dirname}/config.json`);
-let config = {};
-
-try {
-    config = require(dirConfig);
-} catch (err) {
-    log.error("CONFIG", "config.json not found or invalid");
-    config = { adminBot: [], prefix: "!", language: "en" };
+function validJSON(pathDir) {
+    try {
+        if (!fs.existsSync(pathDir))
+            throw new Error(`File "${pathDir}" not found`);
+        JSON.parse(fs.readFileSync(pathDir, 'utf-8'));
+        return true;
+    }
+    catch (err) {
+        throw new Error(err.message);
+    }
 }
+
+const { NODE_ENV } = process.env;
+const dirConfig = path.normalize(`${__dirname}/config.json`);
+const dirConfigCommands = path.normalize(`${__dirname}/configCommands.json`);
+const dirAccount = path.normalize(`${__dirname}/account.txt`);
+
+let log;
+try {
+    log = require('./logger/log.js');
+} catch (e) {
+    log = {
+        info: (tag, msg) => console.log(`[${tag}] ${msg}`),
+        error: (tag, msg) => console.error(`[${tag}] ${msg}`),
+        warn: (tag, msg) => console.warn(`[${tag}] ${msg}`),
+        success: (tag, msg) => console.log(`[${tag}] ✓ ${msg}`)
+    };
+}
+
+for (const pathDir of [dirConfig, dirConfigCommands]) {
+    try {
+        validJSON(pathDir);
+    }
+    catch (err) {
+        log.error("CONFIG", `Invalid JSON file "${pathDir.replace(__dirname, "")}":\n${err.message}`);
+        process.exit(0);
+    }
+}
+
+const config = require(dirConfig);
+if (config.whiteListMode?.whiteListIds && Array.isArray(config.whiteListMode.whiteListIds))
+    config.whiteListMode.whiteListIds = config.whiteListMode.whiteListIds.map(id => id.toString());
+const configCommands = require(dirConfigCommands);
+
+global.GoatBot = {
+    startTime: Date.now() - process.uptime() * 1000,
+    commands: new Map(),
+    eventCommands: new Map(),
+    commandFilesPath: [],
+    eventCommandsFilesPath: [],
+    aliases: new Map(),
+    onFirstChat: [],
+    onChat: [],
+    onEvent: [],
+    onReply: new Map(),
+    onReaction: new Map(),
+    onAnyEvent: [],
+    config,
+    configCommands,
+    envCommands: {},
+    envEvents: {},
+    envGlobal: {},
+    reLoginBot: function () { },
+    Listening: null,
+    oldListening: [],
+    callbackListenTime: {},
+    storage5Message: [],
+    igApi: null,
+    botID: null
+};
 
 global.db = {
     allThreadData: [],
     allUserData: [],
-    allGlobalData: {}
+    allDashBoardData: [],
+    allGlobalData: [],
+    threadModel: null,
+    userModel: null,
+    dashboardModel: null,
+    globalModel: null,
+    threadsData: null,
+    usersData: null,
+    dashBoardData: null,
+    globalData: null,
+    receivedTheFirstMessage: {}
 };
 
-const commands = new Map();
-const events = new Map();
+global.client = {
+    dirConfig,
+    dirConfigCommands,
+    dirAccount,
+    countDown: {},
+    cache: {},
+    database: {
+        creatingThreadData: [],
+        creatingUserData: [],
+        creatingDashBoardData: [],
+        creatingGlobalData: []
+    },
+    commandBanned: configCommands.commandBanned
+};
 
-async function loadCommands() {
-    const cmdPath = path.join(__dirname, "scripts", "cmds");
-    const files = fs.readdirSync(cmdPath).filter(f => f.endsWith(".js"));
-    
-    for (const file of files) {
-        try {
-            delete require.cache[require.resolve(path.join(cmdPath, file))];
-            const cmd = require(path.join(cmdPath, file));
-            const name = file.replace(".js", "");
-            commands.set(name, cmd);
-            log.success("COMMAND", `Loaded ${name}`);
-        } catch (err) {
-            log.error("COMMAND", `Failed to load ${file}: ${err.message}`);
-        }
-    }
-}
-
-async function loadEvents() {
-    const evtPath = path.join(__dirname, "scripts", "events");
-    const files = fs.readdirSync(evtPath).filter(f => f.endsWith(".js"));
-    
-    for (const file of files) {
-        try {
-            delete require.cache[require.resolve(path.join(evtPath, file))];
-            const evt = require(path.join(evtPath, file));
-            const name = file.replace(".js", "");
-            events.set(name, evt);
-            log.success("EVENT", `Loaded ${name}`);
-        } catch (err) {
-            log.error("EVENT", `Failed to load ${file}: ${err.message}`);
-        }
-    }
-}
-
-function createMessageAPI(api, event) {
-    return {
-        send: (msg, callback) => api.sendMessage(event.threadID, msg, callback),
-        reply: (msg, callback) => api.sendMessage(event.threadID, msg, callback),
-        react: (emoji) => api.setMessageReaction && api.setMessageReaction(event.messageID, emoji),
-        unsend: (msgID) => api.unsendMessage && api.unsendMessage(msgID || event.messageID),
-        err: (msg) => api.sendMessage(event.threadID, `❌ Error: ${msg}`)
+let utils;
+try {
+    utils = require("./utils.js");
+} catch (e) {
+    utils = {
+        log: log,
+        getText: (file, key, ...args) => key,
+        convertTime: (ms) => `${Math.floor(ms / 1000)}s`,
+        colors: { gray: s => s, green: s => s },
+        randomString: (len) => Math.random().toString(36).substring(2, 2 + len)
     };
 }
+global.utils = utils;
 
-async function handleCommand(api, event) {
-    const { body, senderID, threadID } = event;
-    if (!body || !body.startsWith(config.prefix || "!")) return;
-    
-    const args = body.slice((config.prefix || "!").length).trim().split(/ +/);
-    const commandName = args.shift().toLowerCase();
-    
-    const command = commands.get(commandName);
-    if (!command) return;
-    
-    const message = createMessageAPI(api, event);
-    
-    const usersData = {
-        get: async (userID) => {
-            let user = global.db.allUserData.find(u => u.userID === userID);
-            if (!user) {
-                user = { userID, data: {}, money: 0 };
-                global.db.allUserData.push(user);
-            }
-            return user;
-        },
-        set: async (userID, data) => {
-            const user = await usersData.get(userID);
-            Object.assign(user.data, data);
-            return user;
-        },
-        create: async (userID) => {
-            const user = { userID, data: {}, money: 0 };
-            global.db.allUserData.push(user);
-            return user;
+global.temp = {
+    createThreadData: [],
+    createUserData: [],
+    createThreadDataError: [],
+    filesOfGoogleDrive: {
+        arraybuffer: {},
+        stream: {},
+        fileNames: {}
+    },
+    contentScripts: {
+        cmds: {},
+        events: {}
+    }
+};
+
+const watchAndReloadConfig = (dir, type, prop, logName) => {
+    let lastModified = fs.statSync(dir).mtimeMs;
+    let isFirstModified = true;
+
+    fs.watch(dir, (eventType) => {
+        if (eventType === type) {
+            setTimeout(() => {
+                try {
+                    if (isFirstModified) {
+                        isFirstModified = false;
+                        return;
+                    }
+                    if (lastModified === fs.statSync(dir).mtimeMs) return;
+                    global.GoatBot[prop] = JSON.parse(fs.readFileSync(dir, 'utf-8'));
+                    log.success(logName, `Reloaded ${dir.replace(process.cwd(), "")}`);
+                }
+                catch (err) {
+                    log.warn(logName, `Can't reload ${dir.replace(process.cwd(), "")}`);
+                }
+                finally {
+                    lastModified = fs.statSync(dir).mtimeMs;
+                }
+            }, 200);
         }
-    };
-    
-    const threadsData = {
-        get: async (threadID) => {
-            let thread = global.db.allThreadData.find(t => t.threadID === threadID);
-            if (!thread) {
-                thread = { threadID, data: {}, adminIDs: [] };
-                global.db.allThreadData.push(thread);
-            }
-            return thread;
-        },
-        set: async (threadID, data) => {
-            const thread = await threadsData.get(threadID);
-            Object.assign(thread.data, data);
-            return thread;
-        },
-        create: async (threadID) => {
-            const thread = { threadID, data: {}, adminIDs: [] };
-            global.db.allThreadData.push(thread);
-            return thread;
-        }
-    };
-    
-    try {
-        if (command.onStart) {
-            await command.onStart({
-                api,
-                event,
-                args,
-                message,
-                commandName,
-                usersData,
-                threadsData,
-                prefix: config.prefix || "!",
-                role: config.adminBot?.includes(senderID) ? 2 : 0,
-                getLang: (key) => key
-            });
-        }
-        
-        log.info("COMMAND", `${commandName} executed by ${senderID}`);
-    } catch (err) {
-        log.error("COMMAND", `Error in ${commandName}: ${err.message}`);
-        message.reply(`❌ Error: ${err.message}`);
+    });
+};
+
+watchAndReloadConfig(dirConfigCommands, 'change', 'configCommands', 'CONFIG COMMANDS');
+watchAndReloadConfig(dirConfig, 'change', 'config', 'CONFIG');
+
+global.GoatBot.envGlobal = global.GoatBot.configCommands.envGlobal || {};
+global.GoatBot.envCommands = global.GoatBot.configCommands.envCommands || {};
+global.GoatBot.envEvents = global.GoatBot.configCommands.envEvents || {};
+
+const getText = global.utils.getText || ((file, key) => key);
+
+if (config.autoRestart) {
+    const time = config.autoRestart.time;
+    if (!isNaN(time) && time > 0) {
+        log.info("AUTO RESTART", `Auto restart after ${time}ms`);
+        setTimeout(() => {
+            log.info("AUTO RESTART", "Restarting...");
+            process.exit(2);
+        }, time);
     }
 }
 
-async function handleEvent(api, event) {
-    for (const [name, evt] of events) {
-        try {
-            if (evt.onStart) {
-                await evt.onStart({ api, event });
-            }
-        } catch (err) {
-            log.error("EVENT", `Error in ${name}: ${err.message}`);
-        }
-    }
-}
+console.log("\n");
+console.log("╔══════════════════════════════════════════════════════════╗");
+console.log("║     ██████╗  ██████╗  █████╗ ████████╗██████╗  ██████╗ ████████╗    ║");
+console.log("║    ██╔════╝ ██╔═══██╗██╔══██╗╚══██╔══╝██╔══██╗██╔═══██╗╚══██╔══╝    ║");
+console.log("║    ██║  ███╗██║   ██║███████║   ██║   ██████╔╝██║   ██║   ██║       ║");
+console.log("║    ██║   ██║██║   ██║██╔══██║   ██║   ██╔══██╗██║   ██║   ██║       ║");
+console.log("║    ╚██████╔╝╚██████╔╝██║  ██║   ██║   ██████╔╝╚██████╔╝   ██║       ║");
+console.log("║     ╚═════╝  ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚═════╝  ╚═════╝    ╚═╝       ║");
+console.log("║                                                                      ║");
+console.log("║              GoatBot V2 - Instagram Port                            ║");
+console.log("║         Based on NTKhang's GoatBot V2 (Team Calyx)                  ║");
+console.log("╚══════════════════════════════════════════════════════════╝");
+console.log("\n");
 
-async function startBot() {
-    log.info("STARTUP", "Starting Instagram GoatBot...");
-    
-    await loadCommands();
-    await loadEvents();
-    
-    const login = require("./ig-chat-api");
-    
-    const loginData = {
-        accessToken: process.env.INSTAGRAM_ACCESS_TOKEN || process.env.IG_ACCESS_TOKEN,
-        igUserID: process.env.INSTAGRAM_PAGE_ID || process.env.IG_USER_ID,
-        verifyToken: process.env.INSTAGRAM_VERIFY_TOKEN || process.env.IG_VERIFY_TOKEN || "goatbot_ig_verify",
-        webhookPort: process.env.PORT || 5000
-    };
-    
-    if (!loginData.accessToken || !loginData.igUserID) {
-        log.error("LOGIN", "Missing INSTAGRAM_ACCESS_TOKEN or INSTAGRAM_PAGE_ID in environment");
-        log.info("LOGIN", "Set these in .env file or Secrets tab");
-        log.info("SETUP", "Follow Instagram Graph API setup guide:");
-        log.info("SETUP", "1. Create Facebook App with Instagram permissions");
-        log.info("SETUP", "2. Get Page Access Token with instagram_manage_messages scope");
-        log.info("SETUP", "3. Configure webhook to https://your-domain/webhook");
-        process.exit(1);
-    }
-    
-    try {
-        const api = await new Promise((resolve, reject) => {
-            login(loginData, (err, apiInstance) => {
-                if (err) reject(err);
-                else resolve(apiInstance);
-            });
-        });
-        
-        log.success("LOGIN", "Connected to Instagram API");
-        log.info("BOT", `Bot ID: ${loginData.igUserID}`);
-        log.info("BOT", `Prefix: ${config.prefix || "!"}`);
-        log.info("BOT", `Commands loaded: ${commands.size}`);
-        log.info("BOT", `Events loaded: ${events.size}`);
-        
-        api.on('message', async (event) => {
-            try {
-                log.info("MESSAGE", `From ${event.senderID}: ${event.body}`);
-                
-                await handleEvent(api, event);
-                await handleCommand(api, event);
-            } catch (err) {
-                log.error("HANDLER", err.message);
-            }
-        });
-        
-        api.listen();
-        log.success("LISTEN", "Bot is now listening for Instagram messages");
-        log.info("WEBHOOK", "Make sure your webhook is configured at Facebook Developer Console");
-        
-    } catch (err) {
-        log.error("LOGIN", `Failed to start: ${err.message}`);
-        process.exit(1);
-    }
-}
-
-startBot();
+require('./bot/login/loginIG.js');

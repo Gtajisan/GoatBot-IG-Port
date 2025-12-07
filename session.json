@@ -1,0 +1,56 @@
+[
+  {
+    "key": "sessionid",
+    "value": "YOUR_SESSION_ID_HERE",
+    "domain": "instagram.com",
+    "path": "/",
+    "hostOnly": false,
+    "creation": "2025-12-07T16:40:05.360Z",
+    "lastAccessed": "2025-12-07T16:40:05.360Z"
+  },
+  {
+    "key": "ds_user_id",
+    "value": "YOUR_USER_ID_HERE",
+    "domain": "instagram.com",
+    "path": "/",
+    "hostOnly": false,
+    "creation": "2025-12-07T16:40:05.360Z",
+    "lastAccessed": "2025-12-07T16:40:05.360Z"
+  },
+  {
+    "key": "csrftoken",
+    "value": "YOUR_CSRF_TOKEN_HERE",
+    "domain": "instagram.com",
+    "path": "/",
+    "hostOnly": false,
+    "creation": "2025-12-07T16:40:05.360Z",
+    "lastAccessed": "2025-12-07T16:40:05.360Z"
+  },
+  {
+    "key": "mid",
+    "value": "YOUR_MID_HERE",
+    "domain": "instagram.com",
+    "path": "/",
+    "hostOnly": false,
+    "creation": "2025-12-07T16:40:05.360Z",
+    "lastAccessed": "2025-12-07T16:40:05.360Z"
+  },
+  {
+    "key": "ig_did",
+    "value": "YOUR_IG_DID_HERE",
+    "domain": "instagram.com",
+    "path": "/",
+    "hostOnly": false,
+    "creation": "2025-12-07T16:40:05.360Z",
+    "lastAccessed": "2025-12-07T16:40:05.360Z"
+  },
+  {
+    "key": "rur",
+    "value": "YOUR_RUR_HERE",
+    "domain": "instagram.com",
+    "path": "/",
+    "hostOnly": false,
+    "creation": "2025-12-07T16:40:05.360Z",
+    "lastAccessed": "2025-12-07T16:40:05.360Z"
+  }
+]
