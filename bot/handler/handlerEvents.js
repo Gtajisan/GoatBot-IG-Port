@@ -219,12 +219,12 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
 			const args = body.slice(prefix.length).trim().split(/ +/);
 			// ————————————  CHECK HAS COMMAND ——————————— //
 			let commandName = args.shift().toLowerCase();
-			let command = GoatBot.commands.get(commandName) || GoatBot.commands.get(GoatBot.aliases.get(commandName));
+			let command = global.GoatBot.commands.get(commandName) || global.GoatBot.commands.get(global.GoatBot.aliases.get(commandName));
 			// ———————— CHECK ALIASES SET BY GROUP ———————— //
 			const aliasesData = threadData.data.aliases || {};
 			for (const cmdName in aliasesData) {
 				if (aliasesData[cmdName].includes(commandName)) {
-					command = GoatBot.commands.get(cmdName);
+					command = global.GoatBot.commands.get(cmdName);
 					break;
 				}
 			}
