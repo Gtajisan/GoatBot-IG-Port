@@ -10,3 +10,19 @@ deploymentTarget = "cloudrun"
 
 [agent]
 expertMode = true
+
+[workflows]
+runButton = "Run GoatBot"
+
+[[workflows.workflow]]
+name = "Run GoatBot"
+author = 29101665
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm install"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node index.js"

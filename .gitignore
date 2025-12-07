@@ -1,0 +1,9 @@
+
+node_modules/
+package-lock.json
+database/
+temp_*/
+*.log
+account.txt
+config.json
+.env
