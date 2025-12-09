@@ -298,8 +298,35 @@ function login(loginData, options, callback) {
         jar,
         withCredentials: true,
         baseURL: "https://www.instagram.com",
-        timeout: 30000
+        timeout: 30000,
+        maxRedirects: 5
     }));
+    
+    let lastRequestTime = 0;
+    const MIN_REQUEST_DELAY = 1000;
+    
+    axiosInstance.interceptors.request.use(async (config) => {
+        const now = Date.now();
+        const timeSinceLastRequest = now - lastRequestTime;
+        if (timeSinceLastRequest < MIN_REQUEST_DELAY) {
+            await new Promise(resolve => setTimeout(resolve, MIN_REQUEST_DELAY - timeSinceLastRequest));
+        }
+        lastRequestTime = Date.now();
+        config.headers = { ...config.headers, ...getHeaders(ctx) };
+        return config;
+    }, (error) => {
+        return Promise.reject(error);
+    });
+    
+    axiosInstance.interceptors.response.use(
+        (response) => response,
+        async (error) => {
+            if (error.response?.status === 429) {
+                console.log("[ig-chat-api] Rate limit detected - cooling down");
+            }
+            return Promise.reject(error);
+        }
+    );
     
     const ctx = {
         userID: userID,

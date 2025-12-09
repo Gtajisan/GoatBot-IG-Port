@@ -10,11 +10,31 @@ module.exports = function(ctx, api) {
         let processedMessages = new Set();
         let isListening = true;
         let isFirstPoll = true;
+        let errorCount = 0;
+        let currentDelay = 5000;
+        const MIN_DELAY = 5000;
+        const MAX_DELAY = 120000;
+        let lastRequestTime = 0;
         
         console.log("[ig-chat-api] Starting message listener...");
         
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+        
+        const getBackoffDelay = () => {
+            if (errorCount === 0) return MIN_DELAY;
+            const delay = Math.min(MIN_DELAY * Math.pow(2, errorCount - 1), MAX_DELAY);
+            return delay + Math.random() * 2000;
+        };
+        
         const pollForMessages = async () => {
             if (!isListening) return;
+            
+            const now = Date.now();
+            const timeSinceLastRequest = now - lastRequestTime;
+            if (timeSinceLastRequest < MIN_DELAY) {
+                await sleep(MIN_DELAY - timeSinceLastRequest);
+            }
+            lastRequestTime = Date.now();
             
             try {
                 const headers = {
@@ -27,7 +47,10 @@ module.exports = function(ctx, api) {
                     "X-Requested-With": "XMLHttpRequest",
                     "X-CSRFToken": ctx.csrfToken || "",
                     "Origin": "https://www.instagram.com",
-                    "Referer": "https://www.instagram.com/direct/inbox/"
+                    "Referer": "https://www.instagram.com/direct/inbox/",
+                    "Sec-Fetch-Dest": "empty",
+                    "Sec-Fetch-Mode": "cors",
+                    "Sec-Fetch-Site": "same-origin"
                 };
                 
                 const response = await ctx.axios.get("https://www.instagram.com/api/v1/direct_v2/inbox/", {
@@ -37,8 +60,12 @@ module.exports = function(ctx, api) {
                         limit: 20,
                         thread_message_limit: 10
                     },
-                    headers
+                    headers,
+                    timeout: 15000
                 });
+                
+                errorCount = 0;
+                currentDelay = MIN_DELAY;
                 
                 if (response.data && response.data.inbox) {
                     const threads = response.data.inbox.threads || [];
@@ -85,15 +112,29 @@ module.exports = function(ctx, api) {
                     }
                 }
             } catch (error) {
+                errorCount++;
+                currentDelay = getBackoffDelay();
+                
                 if (error.response?.status === 429) {
-                    console.log("[ig-chat-api] Rate limited, waiting 60 seconds...");
-                    await new Promise(resolve => setTimeout(resolve, 60000));
+                    console.log("[ig-chat-api] Rate limited, backing off for 2 minutes...");
+                    errorCount = Math.max(errorCount, 5);
+                    currentDelay = 120000;
+                    await sleep(currentDelay);
                 } else if (error.response?.status === 401 || error.response?.status === 403) {
-                    console.error("[ig-chat-api] Session expired or invalid");
+                    console.error("[ig-chat-api] Session expired or invalid - stopping listener");
+                    isListening = false;
                     if (callback) callback(error);
                     emitter.emit("error", error);
+                    return;
+                } else if (error.response?.status === 400) {
+                    console.log(`[ig-chat-api] Bad request (${errorCount} errors) - backing off for ${Math.round(currentDelay/1000)}s`);
+                    await sleep(currentDelay);
+                } else if (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT') {
+                    console.log(`[ig-chat-api] Connection issue - retrying in ${Math.round(currentDelay/1000)}s`);
+                    await sleep(currentDelay);
                 } else {
-                    console.log(`[ig-chat-api] Polling error: ${error.message}`);
+                    console.log(`[ig-chat-api] Error (${errorCount}): ${error.message} - retrying in ${Math.round(currentDelay/1000)}s`);
+                    await sleep(currentDelay);
                 }
             }
         };
@@ -176,8 +217,16 @@ module.exports = function(ctx, api) {
             };
         };
         
-        pollForMessages();
-        pollingInterval = setInterval(pollForMessages, 3000);
+        const startPolling = async () => {
+            while (isListening) {
+                await pollForMessages();
+                if (isListening) {
+                    await sleep(currentDelay);
+                }
+            }
+        };
+        
+        startPolling();
         
         ctx.stopListening = () => {
             isListening = false;
@@ -190,7 +239,7 @@ module.exports = function(ctx, api) {
         
         const stopListening = ctx.stopListening;
         
-        console.log("[ig-chat-api] ✓ Message listener started (polling mode)");
+        console.log("[ig-chat-api] ✓ Message listener started with adaptive polling (5-120s intervals)");
         
         return stopListening;
     };

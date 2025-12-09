@@ -74,11 +74,17 @@
     "forceLogin": true,
     "listenEvents": true,
     "updatePresence": false,
-    "listenTyping": true,
+    "listenTyping": false,
     "logLevel": "info",
     "selfListen": false,
     "selfListenEvent": true,
     "autoMarkDelivery": false,
     "autoReconnect": true
+  },
+  "instagramPolling": {
+    "minDelay": 5000,
+    "maxDelay": 120000,
+    "initialDelay": 5000,
+    "notes": "Polling delays in milliseconds to avoid rate limits"
   }
 }
