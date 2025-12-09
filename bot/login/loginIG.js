@@ -396,7 +396,17 @@ function startDashboard() {
 }
 
 async function handleMessage(api, event) {
-    if (!event || !event.body) return;
+    if (!event) {
+        log.warn("MESSAGE", "Received null event");
+        return;
+    }
+    
+    log.info("MESSAGE", `Received: type=${event.type}, from=${event.senderID}, body="${(event.body || "").substring(0, 50)}"`);
+    
+    if (!event.body) {
+        log.info("MESSAGE", "Skipping event with no body (media/reaction/etc)");
+        return;
+    }
     
     const { body, senderID, threadID, messageID } = event;
     const prefix = config.prefix || "/";

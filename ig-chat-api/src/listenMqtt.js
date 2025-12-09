@@ -7,8 +7,9 @@ module.exports = function(ctx, api) {
     return function listenMqtt(callback) {
         const emitter = new EventEmitter();
         let pollingInterval = null;
-        let lastCursor = null;
+        let processedMessages = new Set();
         let isListening = true;
+        let isFirstPoll = true;
         
         console.log("[ig-chat-api] Starting message listener...");
         
@@ -16,13 +17,27 @@ module.exports = function(ctx, api) {
             if (!isListening) return;
             
             try {
-                const response = await ctx.axios.get("/api/v1/direct_v2/inbox/", {
+                const headers = {
+                    "User-Agent": ctx.globalOptions.userAgent || "Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+                    "Accept": "*/*",
+                    "Accept-Language": "en-US,en;q=0.9",
+                    "X-IG-App-ID": "936619743392459",
+                    "X-ASBD-ID": "129477",
+                    "X-IG-WWW-Claim": ctx.wwwClaim || "0",
+                    "X-Requested-With": "XMLHttpRequest",
+                    "X-CSRFToken": ctx.csrfToken || "",
+                    "Origin": "https://www.instagram.com",
+                    "Referer": "https://www.instagram.com/direct/inbox/"
+                };
+                
+                const response = await ctx.axios.get("https://www.instagram.com/api/v1/direct_v2/inbox/", {
                     params: {
-                        visual_message_return_type: "unseen",
                         persistentBadging: true,
-                        limit: 20
+                        folder: "",
+                        limit: 20,
+                        thread_message_limit: 10
                     },
-                    headers: api.getHeaders()
+                    headers
                 });
                 
                 if (response.data && response.data.inbox) {
@@ -32,22 +47,41 @@ module.exports = function(ctx, api) {
                         const items = thread.items || [];
                         
                         for (const item of items) {
-                            if (!lastCursor || item.timestamp > lastCursor) {
-                                if (item.user_id?.toString() !== ctx.userID) {
-                                    const event = formatEvent(thread, item);
-                                    
-                                    if (callback) {
-                                        callback(null, event);
-                                    }
-                                    emitter.emit("message", event);
-                                    api.emit("message", event);
+                            const messageKey = `${thread.thread_id}_${item.item_id}`;
+                            
+                            if (isFirstPoll) {
+                                processedMessages.add(messageKey);
+                                continue;
+                            }
+                            
+                            if (processedMessages.has(messageKey)) {
+                                continue;
+                            }
+                            
+                            processedMessages.add(messageKey);
+                            
+                            if (processedMessages.size > 1000) {
+                                const arr = Array.from(processedMessages);
+                                processedMessages = new Set(arr.slice(-500));
+                            }
+                            
+                            if (item.user_id?.toString() !== ctx.userID) {
+                                const event = formatEvent(thread, item);
+                                
+                                console.log(`[ig-chat-api] New message from ${event.senderID}: "${event.body?.substring(0, 50)}..."`);
+                                
+                                if (callback) {
+                                    callback(null, event);
                                 }
+                                emitter.emit("message", event);
+                                api.emit("message", event);
                             }
                         }
                     }
                     
-                    if (threads.length > 0 && threads[0].items?.length > 0) {
-                        lastCursor = threads[0].items[0].timestamp;
+                    if (isFirstPoll) {
+                        isFirstPoll = false;
+                        console.log("[ig-chat-api] Initial sync complete, now listening for new messages...");
                     }
                 }
             } catch (error) {
@@ -58,6 +92,8 @@ module.exports = function(ctx, api) {
                     console.error("[ig-chat-api] Session expired or invalid");
                     if (callback) callback(error);
                     emitter.emit("error", error);
+                } else {
+                    console.log(`[ig-chat-api] Polling error: ${error.message}`);
                 }
             }
         };
