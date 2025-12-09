@@ -531,7 +531,7 @@ async function getAppStateToLogin(loginWithEmail) {
 				const character = '>';
 				function showOptions() {
 					rl.output.write(`\r${options.map((option, index) => index === currentOption ? colors.blueBright(`${character} (${index + 1}) ${option}`) : `  (${index + 1}) ${option}`).join('\n')}\u001B`);
-					rl.write('\u001B[?25l'); 
+					rl.write('\u001B[?25l');
 				}
 				rl.input.on('keypress', (_, key) => {
 					if (key.name === 'up') {
@@ -544,7 +544,7 @@ async function getAppStateToLogin(loginWithEmail) {
 						const number = parseInt(key.name);
 						if (number >= 0 && number <= options.length)
 							currentOption = number - 1;
-						process.stdout.write('\x1b[1D'); 
+						process.stdout.write('\x1b[1D');
 					}
 					else if (key.name === 'enter' || key.name === 'return') {
 						rl.input.removeAllListeners('keypress');
@@ -554,7 +554,7 @@ async function getAppStateToLogin(loginWithEmail) {
 						resolve();
 					}
 					else {
-						process.stdout.write('\x1b[1D'); 
+						process.stdout.write('\x1b[1D');
 					}
 
 					clearLines(options.length);
@@ -563,7 +563,7 @@ async function getAppStateToLogin(loginWithEmail) {
 				showOptions();
 			});
 
-			rl.write('\u001B[?25h\n'); // show cursor 
+			rl.write('\u001B[?25h\n'); // show cursor
 			clearLines(options.length + 1);
 			log.info("LOGIN FACEBOOK", getText('login', 'loginWith', options[currentOption]));
 
@@ -627,6 +627,186 @@ function stopListening(keyListen) {
 // 	if (callbackListenTime[keyListen])
 // 		callbackListenTime[keyListen] = () => { };
 // }
+
+// --- NEW CODE START ---
+
+const logger = require("../../logger/log.js");
+// const getText = global.utils.getText; // Already defined globally
+// const fs = require("fs-extra"); // Already required
+// const path = require("path"); // Already required
+// const axios = require("axios"); // Already required
+
+// Colors for beautiful console output
+const colors = {
+	reset: "\x1b[0m",
+	bright: "\x1b[1m",
+	cyan: "\x1b[36m",
+	green: "\x1b[32m",
+	yellow: "\x1b[33m",
+	blue: "\x1b[34m",
+	magenta: "\x1b[35m",
+	red: "\x1b[31m",
+	gray: "\x1b[90m",
+	white: "\x1b[97m"
+};
+
+// Box drawing characters
+const box = {
+	topLeft: "╔",
+	topRight: "╗",
+	bottomLeft: "╚",
+	bottomRight: "╝",
+	horizontal: "═",
+	vertical: "║",
+	divider: "─"
+};
+
+function createBox(content, width = 70) {
+	const lines = content.split("\n");
+	let result = `${colors.cyan}${box.topLeft}${box.horizontal.repeat(width)}${box.topRight}${colors.reset}\n`;
+
+	lines.forEach(line => {
+		// Remove ANSI escape codes for accurate length calculation
+		const cleanLine = line.replace(/\x1b\[[0-9;]*m/g, "");
+		const padding = width - cleanLine.length;
+		result += `${colors.cyan}${box.vertical}${colors.reset} ${line}${" ".repeat(Math.max(0, padding))} ${colors.cyan}${box.vertical}${colors.reset}\n`;
+	});
+
+	result += `${colors.cyan}${box.bottomLeft}${box.horizontal.repeat(width)}${box.bottomRight}${colors.reset}`;
+	return result;
+}
+
+function createDivider(width = 70) {
+	return `${colors.gray}${box.divider.repeat(width + 2)}${colors.reset}`;
+}
+
+function formatUptime(ms) {
+	const seconds = Math.floor(ms / 1000);
+	const minutes = Math.floor(seconds / 60);
+	const hours = Math.floor(minutes / 60);
+	const days = Math.floor(hours / 24);
+
+	if (days > 0) return `${days}d ${hours % 24}h ${minutes % 60}m`;
+	if (hours > 0) return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
+	if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
+	return `${seconds}s`;
+}
+
+async function displayBotStats(api, threadsData, usersData) {
+	const startTime = Date.now();
+	global.GoatBot.startTime = startTime;
+
+	// Fetch data dynamically or use globally available data if populated
+	const allThreads = global.db.allThreadData || [];
+	const allUsers = global.db.allUserData || [];
+
+	// Count active groups (where bot is still a member)
+	const activeGroups = allThreads.filter(thread =>
+		thread.isGroup && thread.members.some(m => m.userID == api.getCurrentUserID() && m.inGroup)
+	);
+
+	// Count total unique users
+	const totalUsers = allUsers.length;
+
+	// Count users in active groups
+	const activeUsers = new Set();
+	activeGroups.forEach(thread => {
+		thread.members.forEach(member => {
+			if (member.inGroup) activeUsers.add(member.userID);
+		});
+	});
+
+	// Bot information
+	const botID = api.getCurrentUserID();
+	const botInfo = allUsers.find(u => u.userID == botID) || {};
+	const botName = botInfo.name || "Instagram Bot"; // Default name if not found
+
+	// Commands and events count
+	const commandsCount = global.client.commands.size;
+	const eventsCount = global.client.events.size;
+
+	// Memory usage
+	const memUsage = process.memoryUsage();
+	const memUsed = (memUsage.heapUsed / 1024 / 1024).toFixed(2);
+	const memTotal = (memUsage.heapTotal / 1024 / 1024).toFixed(2);
+
+	console.clear();
+
+	// Banner
+	const banner = `
+${colors.bright}${colors.cyan}    ██████╗  ██████╗  █████╗ ████████╗██████╗  ██████╗ ████████╗${colors.reset}
+${colors.bright}${colors.cyan}   ██╔════╝ ██╔═══██╗██╔══██╗╚══██╔══╝██╔══██╗██╔═══██╗╚══██╔══╝${colors.reset}
+${colors.bright}${colors.cyan}   ██║  ███╗██║   ██║███████║   ██║   ██████╔╝██║   ██║   ██║${colors.reset}
+${colors.bright}${colors.cyan}   ██║   ██║██║   ██║██╔══██║   ██║   ██╔══██╗██║   ██║   ██║${colors.reset}
+${colors.bright}${colors.cyan}   ╚██████╔╝╚██████╔╝██║  ██║   ██║   ██████╔╝╚██████╔╝   ██║${colors.reset}
+${colors.bright}${colors.cyan}    ╚═════╝  ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚═════╝  ╚═════╝    ╚═╝${colors.reset}
+${colors.gray}                    GoatBot V2 - Instagram Port${colors.reset}
+${colors.gray}                        Developer: Gtajisan${colors.reset}
+`;
+
+	console.log(banner);
+	console.log("\n");
+
+	// Bot Status
+	const statusContent = `${colors.bright}${colors.green}● BOT STATUS${colors.reset}
+${colors.gray}┌─────────────────────────────────────────────────────────────────┐${colors.reset}
+${colors.white}│${colors.reset} ${colors.yellow}Bot Name:${colors.reset}      ${colors.bright}${botName}${colors.reset}
+${colors.white}│${colors.reset} ${colors.yellow}Bot ID:${colors.reset}        ${colors.bright}${botID}${colors.reset}
+${colors.white}│${colors.reset} ${colors.yellow}Status:${colors.reset}        ${colors.bright}${colors.green}● Online & Running${colors.reset}
+${colors.white}│${colors.reset} ${colors.yellow}Platform:${colors.reset}      ${colors.bright}Instagram${colors.reset}
+${colors.gray}└─────────────────────────────────────────────────────────────────┘${colors.reset}`;
+
+	console.log(statusContent);
+	console.log("\n");
+
+	// Statistics
+	const statsContent = `${colors.bright}${colors.blue}📊 STATISTICS${colors.reset}
+${colors.gray}┌─────────────────────────────────────────────────────────────────┐${colors.reset}
+${colors.white}│${colors.reset} ${colors.cyan}Groups:${colors.reset}
+${colors.white}│${colors.reset}   ${colors.gray}├─${colors.reset} ${colors.yellow}Total Groups:${colors.reset}          ${colors.bright}${allThreads.filter(t => t.isGroup).length}${colors.reset}
+${colors.white}│${colors.reset}   ${colors.gray}└─${colors.reset} ${colors.green}Active Groups:${colors.reset}         ${colors.bright}${activeGroups.length}${colors.reset}
+${colors.white}│${colors.reset}
+${colors.white}│${colors.reset} ${colors.cyan}Users:${colors.reset}
+${colors.white}│${colors.reset}   ${colors.gray}├─${colors.reset} ${colors.yellow}Total Users:${colors.reset}           ${colors.bright}${totalUsers}${colors.reset}
+${colors.white}│${colors.reset}   ${colors.gray}└─${colors.reset} ${colors.green}Active Users:${colors.reset}          ${colors.bright}${activeUsers.size}${colors.reset}
+${colors.white}│${colors.reset}
+${colors.white}│${colors.reset} ${colors.cyan}Commands & Events:${colors.reset}
+${colors.white}│${colors.reset}   ${colors.gray}├─${colors.reset} ${colors.yellow}Commands Loaded:${colors.reset}       ${colors.bright}${commandsCount}${colors.reset}
+${colors.white}│${colors.reset}   ${colors.gray}└─${colors.reset} ${colors.yellow}Events Loaded:${colors.reset}         ${colors.bright}${eventsCount}${colors.reset}
+${colors.gray}└─────────────────────────────────────────────────────────────────┘${colors.reset}`;
+
+	console.log(statsContent);
+	console.log("\n");
+
+	// System Resources
+	const resourcesContent = `${colors.bright}${colors.magenta}⚙️  SYSTEM RESOURCES${colors.reset}
+${colors.gray}┌─────────────────────────────────────────────────────────────────┐${colors.reset}
+${colors.white}│${colors.reset} ${colors.yellow}Memory Usage:${colors.reset}      ${colors.bright}${memUsed}MB${colors.reset} / ${colors.bright}${memTotal}MB${colors.reset}
+${colors.white}│${colors.reset} ${colors.yellow}Node Version:${colors.reset}      ${colors.bright}${process.version}${colors.reset}
+${colors.white}│${colors.reset} ${colors.yellow}Platform:${colors.reset}          ${colors.bright}${process.platform} (${process.arch})${colors.reset}
+${colors.white}│${colors.reset} ${colors.yellow}Prefix:${colors.reset}            ${colors.bright}${global.GoatBot.config.prefix}${colors.reset}
+${colors.gray}└─────────────────────────────────────────────────────────────────┘${colors.reset}`;
+
+	console.log(resourcesContent);
+	console.log("\n");
+
+	// Footer
+	const footer = `${colors.gray}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}
+${colors.bright}${colors.green}✓${colors.reset} ${colors.white}Bot is ready to receive messages!${colors.reset}
+${colors.gray}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`;
+
+	console.log(footer);
+	console.log("\n");
+
+	// Start uptime display
+	setInterval(() => {
+		const uptime = Date.now() - startTime;
+		const formattedUptime = formatUptime(uptime);
+		process.stdout.write(`\r${colors.gray}Uptime:${colors.reset} ${colors.bright}${colors.green}${formattedUptime}${colors.reset} ${colors.gray}|${colors.reset} ${colors.gray}Memory:${colors.reset} ${colors.bright}${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)}MB${colors.reset}`);
+	}, 1000);
+}
+
+// --- NEW CODE END ---
 
 async function startBot(loginWithEmail) {
 	console.log(colors.hex("#f5ab00")(createLine("START LOGGING IN", true)));
@@ -1164,3 +1344,14 @@ async function startBot(loginWithEmail) {
 
 global.GoatBot.reLoginBot = startBot;
 startBot();
+
+module.exports = async function (api, threadModel, userModel, dashBoardModel, globalModel, usersData, threadsData, dashBoardData, globalData) {
+	// Original login code continues here...
+	const { config } = global.GoatBot;
+	const { userNameBot, password } = config.credentials.facebookAccount;
+
+	// Display bot stats after successful login
+	displayBotStats(api, threadsData, usersData);
+
+	return api;
+};

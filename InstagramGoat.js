@@ -213,4 +213,37 @@ console.log("║         Based on NTKhang's GoatBot V2 (Team Calyx)             
 console.log("╚══════════════════════════════════════════════════════════╝");
 console.log("\n");
 
+// Helper function to format uptime
+function formatUptime(ms) {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    return `${days}d ${hours % 24}h ${minutes % 60}m ${seconds % 60}s`;
+}
+
+// Function to display advanced bot statistics
+function displayAdvancedStats(api, threadsData, usersData) {
+    const uptime = formatUptime(process.uptime() * 1000);
+    const groupCount = threadsData.length;
+    const userCount = usersData.length;
+    const gcCount = global.GoatBot.gcCount || 0; // Assuming gcCount is tracked elsewhere
+
+    console.log("╔══════════════════════════════════════════════════════════╗");
+    console.log("║                     BOT STATISTICS                      ║");
+    console.log("╠══════════════════════════════════════════════════════════╣");
+    console.log(`║ Uptime:          ${uptime.padEnd(40)}║`);
+    console.log(`║ Total Groups:    ${groupCount.toString().padEnd(40)}║`);
+    console.log(`║ Total Users:     ${userCount.toString().padEnd(40)}║`);
+    console.log(`║ GC Count:        ${gcCount.toString().padEnd(40)}║`);
+    console.log("╚══════════════════════════════════════════════════════════╝");
+}
+
+
 require('./bot/login/loginIG.js');
+
+// Example of how gcCount might be incremented (you'll need to implement actual GC tracking)
+// setInterval(() => {
+//     global.GoatBot.gcCount = (global.GoatBot.gcCount || 0) + 1;
+// }, 60000); // Increment every minute for demonstration
