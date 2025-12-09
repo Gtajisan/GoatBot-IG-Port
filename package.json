@@ -116,7 +116,14 @@
     "dev": "set NODE_ENV=development&& node index.js",
     "prod": "set NODE_ENV=production&& node index.js"
   },
-  "author": "NTKhang",
+  "author": "Gtajisan <ffjisan804@gmail.com>",
+  "contributors": [
+    {
+      "name": "NTKhang",
+      "url": "https://github.com/ntkhang03",
+      "role": "Original GoatBot V2 Creator"
+    }
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
