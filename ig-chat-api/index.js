@@ -1,6 +1,6 @@
 "use strict";
 
-const fs = require("fs-extra");
+const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
 const { CookieJar } = require("tough-cookie");
@@ -143,6 +143,8 @@ function buildAPI(ctx) {
         if (ctx.stopListening) ctx.stopListening();
         if (cb) cb();
     };
+
+    api.refreshFb_dtsg = () => Promise.resolve();
 
     const srcPath = path.join(__dirname, "src");
     if (fs.existsSync(srcPath)) {

@@ -1,61 +1,37 @@
 "use strict";
 
-/**
- * @author Gtajisan
- * Instagram Chat API - Create New Group
- */
-
 module.exports = function(ctx, api) {
     return function createNewGroup(participantIDs, groupTitle, callback) {
-        let resolveFunc = () => {};
-        let rejectFunc = () => {};
+        let resolveFunc = () => {}, rejectFunc = () => {};
         const returnPromise = new Promise((resolve, reject) => {
-            resolveFunc = resolve;
-            rejectFunc = reject;
+            resolveFunc = resolve; rejectFunc = reject;
         });
-        
-        if (!callback && typeof groupTitle === "function") {
-            callback = groupTitle;
-            groupTitle = null;
-        }
-        
-        if (!callback) {
-            callback = (err, data) => {
-                if (err) return rejectFunc(err);
-                resolveFunc(data);
-            };
-        }
-        
-        if (!Array.isArray(participantIDs)) {
-            participantIDs = [participantIDs];
-        }
-        
-        const headers = api.getHeaders();
-        
-        const formData = {
-            recipient_users: JSON.stringify(participantIDs.map(id => id.toString())),
-            client_context: Date.now().toString()
+        if (typeof groupTitle === "function") { callback = groupTitle; groupTitle = null; }
+        if (!callback) callback = (err, data) => err ? rejectFunc(err) : resolveFunc(data);
+        if (!Array.isArray(participantIDs)) participantIDs = [participantIDs];
+
+        const params = {
+            recipient_users: JSON.stringify(participantIDs.map(id => [id.toString()])),
+            client_context: `${Date.now()}`
         };
-        
-        if (groupTitle) {
-            formData.thread_title = groupTitle;
-        }
-        
-        ctx.axios.post("/api/v1/direct_v2/create_group_thread/", formData, { headers })
-        .then(response => {
-            if (response.data && response.data.thread_id) {
-                callback(null, {
-                    threadID: response.data.thread_id,
-                    title: groupTitle
-                });
+        if (groupTitle) params.thread_title = groupTitle;
+
+        const body = new URLSearchParams(params).toString();
+
+        ctx.axios.post(
+            "/api/v1/direct_v2/create_group_thread/",
+            body,
+            { headers: { ...api.getHeaders(), "Content-Type": "application/x-www-form-urlencoded" } }
+        )
+        .then(res => {
+            if (res.data?.thread_id) {
+                callback(null, { threadID: res.data.thread_id, title: groupTitle });
             } else {
-                callback(new Error("Failed to create group"));
+                callback(new Error("Failed to create group: no thread_id returned"));
             }
         })
-        .catch(err => {
-            callback(new Error(err.message));
-        });
-        
+        .catch(err => callback(new Error(err.message)));
+
         return returnPromise;
     };
 };

@@ -1,41 +1,24 @@
 "use strict";
 
-/**
- * @author Gtajisan
- * Instagram Chat API - Handle Message Request
- */
-
 module.exports = function(ctx, api) {
     return function handleMessageRequest(threadID, accept, callback) {
-        let resolveFunc = () => {};
-        let rejectFunc = () => {};
+        let resolveFunc = () => {}, rejectFunc = () => {};
         const returnPromise = new Promise((resolve, reject) => {
-            resolveFunc = resolve;
-            rejectFunc = reject;
+            resolveFunc = resolve; rejectFunc = reject;
         });
-        
-        if (!callback) {
-            callback = (err, data) => {
-                if (err) return rejectFunc(err);
-                resolveFunc(data);
-            };
-        }
-        
-        const headers = api.getHeaders();
+        if (!callback) callback = (err, data) => err ? rejectFunc(err) : resolveFunc(data);
+
         const endpoint = accept ? "approve" : "decline";
-        
-        ctx.axios.post("/api/v1/direct_v2/threads/" + threadID + "/" + endpoint + "/", {}, { headers })
-        .then(response => {
-            if (response.data && response.data.status === "ok") {
-                callback(null, { success: true, accepted: accept });
-            } else {
-                callback(null, { success: false });
-            }
-        })
-        .catch(err => {
-            callback(null, { success: false, message: err.message });
-        });
-        
+        const body = new URLSearchParams({ thread_ids: JSON.stringify([threadID.toString()]) }).toString();
+
+        ctx.axios.post(
+            `/api/v1/direct_v2/pending-inbox/${endpoint}/`,
+            body,
+            { headers: { ...api.getHeaders(), "Content-Type": "application/x-www-form-urlencoded" } }
+        )
+        .then(res => callback(null, { success: res.data?.status === "ok", accepted: accept }))
+        .catch(err => callback(null, { success: false, message: err.message }));
+
         return returnPromise;
     };
 };

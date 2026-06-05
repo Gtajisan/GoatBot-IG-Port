@@ -1,72 +1,58 @@
 "use strict";
 
-/**
- * @author Gtajisan
- * Instagram Chat API - Upload Attachment
- */
-
-const fs = require("fs-extra");
+const fs = require("fs");
 const path = require("path");
 const FormData = require("form-data");
 
+const MIME_MAP = {
+    ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+    ".gif": "image/gif", ".webp": "image/webp",
+    ".mp4": "video/mp4", ".mov": "video/quicktime",
+    ".mp3": "audio/mpeg", ".ogg": "audio/ogg", ".m4a": "audio/mp4"
+};
+
 module.exports = function(ctx, api) {
     return function uploadAttachment(attachments, callback) {
-        let resolveFunc = () => {};
-        let rejectFunc = () => {};
+        let resolveFunc = () => {}, rejectFunc = () => {};
         const returnPromise = new Promise((resolve, reject) => {
-            resolveFunc = resolve;
-            rejectFunc = reject;
+            resolveFunc = resolve; rejectFunc = reject;
         });
-        
-        if (!callback) {
-            callback = (err, data) => {
-                if (err) return rejectFunc(err);
-                resolveFunc(data);
-            };
-        }
-        
-        if (!Array.isArray(attachments)) {
-            attachments = [attachments];
-        }
-        
-        const uploads = [];
-        
-        for (const attachment of attachments) {
+        if (!callback) callback = (err, data) => err ? rejectFunc(err) : resolveFunc(data);
+        if (!Array.isArray(attachments)) attachments = [attachments];
+
+        const uploads = attachments.map(attachment => {
             const form = new FormData();
-            
-            if (typeof attachment === "string") {
-                if (fs.existsSync(attachment)) {
-                    form.append("photo", fs.createReadStream(attachment));
-                }
-            } else if (attachment.readable) {
+            const uploadId = Date.now().toString();
+
+            if (typeof attachment === "string" && fs.existsSync(attachment)) {
+                const ext = path.extname(attachment).toLowerCase();
+                const mime = MIME_MAP[ext] || "application/octet-stream";
+                form.append("photo", fs.createReadStream(attachment), {
+                    filename: path.basename(attachment),
+                    contentType: mime
+                });
+                form.append("upload_id", uploadId);
+                form.append("is_sidecar", "0");
+            } else if (attachment && typeof attachment.pipe === "function") {
                 form.append("photo", attachment);
+                form.append("upload_id", uploadId);
+            } else {
+                return Promise.resolve(null);
             }
-            
-            const headers = {
-                ...api.getHeaders(),
-                ...form.getHeaders()
-            };
-            
-            uploads.push(
-                ctx.axios.post("/rupload_igphoto/", form, { headers })
-                .then(response => {
-                    if (response.data && response.data.upload_id) {
-                        return { upload_id: response.data.upload_id };
-                    }
-                    return null;
-                })
-                .catch(() => null)
-            );
-        }
-        
-        Promise.all(uploads)
-        .then(results => {
-            callback(null, results.filter(r => r !== null));
-        })
-        .catch(err => {
-            callback(new Error(err.message));
+
+            return ctx.axios.post(
+                `/rupload_igphoto/${uploadId}`,
+                form,
+                { headers: { ...api.getHeaders(), ...form.getHeaders() } }
+            )
+            .then(res => res.data?.upload_id ? { upload_id: res.data.upload_id } : null)
+            .catch(() => null);
         });
-        
+
+        Promise.all(uploads)
+            .then(results => callback(null, results.filter(r => r !== null)))
+            .catch(err => callback(new Error(err.message)));
+
         return returnPromise;
     };
 };
