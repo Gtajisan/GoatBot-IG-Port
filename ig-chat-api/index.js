@@ -1,14 +1,5 @@
 "use strict";
 
-/**
- * Instagram Chat API (ig-chat-api)
- * 
- * @author Gtajisan
- * @description Instagram Chat API ported from fb-chat-api with Instagram logic
- * @based-on fb-chat-api by NTKhang and DongDev
- * @credit GoatBot V2 Instagram Port
- */
-
 const fs = require("fs-extra");
 const path = require("path");
 const axios = require("axios");
@@ -16,393 +7,308 @@ const { CookieJar } = require("tough-cookie");
 const { wrapper } = require("axios-cookiejar-support");
 const EventEmitter = require("events");
 
-const sendMessage = require("./src/sendMessage");
-const listenMqtt = require("./src/listenMqtt");
-const getUserInfo = require("./src/getUserInfo");
-const getThreadInfo = require("./src/getThreadInfo");
-const getThreadList = require("./src/getThreadList");
-const markAsRead = require("./src/markAsRead");
-const sendTypingIndicator = require("./src/sendTypingIndicator");
-const setMessageReaction = require("./src/setMessageReaction");
-const getCurrentUserID = require("./src/getCurrentUserID");
+const sendMessage      = require("./src/sendMessage");
+const listenMqtt       = require("./src/listenMqtt");
+const getUserInfo      = require("./src/getUserInfo");
+const getThreadInfo    = require("./src/getThreadInfo");
+const getThreadList    = require("./src/getThreadList");
 const getThreadHistory = require("./src/getThreadHistory");
-const unsendMessage = require("./src/unsendMessage");
+const markAsRead       = require("./src/markAsRead");
+const sendTypingIndicator = require("./src/sendTypingIndicator");
+const setMessageReaction  = require("./src/setMessageReaction");
+const getCurrentUserID    = require("./src/getCurrentUserID");
+const unsendMessage       = require("./src/unsendMessage");
 
-const Boolean_Options = [
-    "listenEvents",
-    "selfListen", 
-    "autoMarkDelivery",
-    "autoMarkRead",
-    "autoReconnect",
-    "updatePresence"
-];
+/* ─────────────────────────────────────────────
+   Instagram Web API constants
+───────────────────────────────────────────── */
+const IG_APP_ID    = "936619743392459";
+const IG_BASE_URL  = "https://www.instagram.com";
+
+function buildHeaders(ctx) {
+    return {
+        "User-Agent"        : ctx.globalOptions.userAgent,
+        "Accept"            : "*/*",
+        "Accept-Language"   : "en-US,en;q=0.9",
+        "Accept-Encoding"   : "gzip, deflate, br",
+        "X-IG-App-ID"       : IG_APP_ID,
+        "X-ASBD-ID"         : "129477",
+        "X-IG-WWW-Claim"    : ctx.wwwClaim || "0",
+        "X-Requested-With"  : "XMLHttpRequest",
+        "X-CSRFToken"       : ctx.csrfToken || "",
+        "Origin"            : IG_BASE_URL,
+        "Referer"           : `${IG_BASE_URL}/direct/inbox/`,
+        "Sec-Fetch-Dest"    : "empty",
+        "Sec-Fetch-Mode"    : "cors",
+        "Sec-Fetch-Site"    : "same-origin"
+    };
+}
 
 function setOptions(globalOptions, options) {
+    const boolKeys = ["listenEvents","selfListen","autoMarkDelivery","autoMarkRead","autoReconnect","updatePresence"];
     Object.keys(options || {}).forEach(key => {
-        if (Boolean_Options.includes(key)) {
+        if (boolKeys.includes(key)) {
             globalOptions[key] = Boolean(options[key]);
         } else {
-            switch (key) {
-                case "logLevel":
-                    globalOptions.logLevel = options.logLevel;
-                    break;
-                case "forceLogin":
-                    globalOptions.forceLogin = options.forceLogin;
-                    break;
-                case "userAgent":
-                    globalOptions.userAgent = options.userAgent;
-                    break;
-                default:
-                    globalOptions[key] = options[key];
-                    break;
-            }
+            globalOptions[key] = options[key];
         }
     });
 }
 
-function getHeaders(ctx) {
-    return {
-        "User-Agent": ctx.globalOptions.userAgent || "Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
-        "Accept": "*/*",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
-        "X-IG-App-ID": "936619743392459",
-        "X-ASBD-ID": "129477",
-        "X-IG-WWW-Claim": ctx.wwwClaim || "0",
-        "X-Requested-With": "XMLHttpRequest",
-        "Origin": "https://www.instagram.com",
-        "Referer": "https://www.instagram.com/direct/inbox/",
-        "Sec-Fetch-Dest": "empty",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Site": "same-origin",
-        "X-CSRFToken": ctx.csrfToken || ""
-    };
-}
-
 function buildAPI(ctx) {
     const api = new EventEmitter();
-    
-    api.setOptions = (options) => setOptions(ctx.globalOptions, options);
-    
-    api.getAppState = () => ctx.appState;
-    
-    api.getCurrentUserID = getCurrentUserID(ctx);
-    api.getUserID = () => ctx.userID;
-    
-    api.sendMessage = sendMessage(ctx, api);
-    api.listenMqtt = listenMqtt(ctx, api);
-    api.listen = api.listenMqtt;
-    api.getUserInfo = getUserInfo(ctx);
-    api.getThreadInfo = getThreadInfo(ctx);
-    api.getThreadList = getThreadList(ctx);
-    api.getThreadHistory = getThreadHistory(ctx);
-    api.markAsRead = markAsRead(ctx);
-    api.markAsDelivered = api.markAsRead;
+
+    api.setOptions          = (opts)  => setOptions(ctx.globalOptions, opts);
+    api.getAppState         = ()      => ctx.appState;
+    api.getHeaders          = ()      => buildHeaders(ctx);
+    api.getCurrentUserID    = getCurrentUserID(ctx);
+    api.getUserID           = ()      => ctx.userID;
+
+    api.sendMessage         = sendMessage(ctx, api);
+    api.listenMqtt          = listenMqtt(ctx, api);
+    api.listen              = api.listenMqtt;
+    api.getUserInfo         = getUserInfo(ctx);
+    api.getThreadInfo       = getThreadInfo(ctx);
+    api.getThreadList       = getThreadList(ctx);
+    api.getThreadHistory    = getThreadHistory(ctx);
+    api.markAsRead          = markAsRead(ctx);
+    api.markAsDelivered     = api.markAsRead;
     api.sendTypingIndicator = sendTypingIndicator(ctx);
-    api.setMessageReaction = setMessageReaction(ctx);
-    api.unsendMessage = unsendMessage(ctx);
-    api.deleteMessage = api.unsendMessage;
-    
-    api.changeNickname = (nickname, threadID, participantID, callback) => {
-        if (callback) callback(null);
+    api.setMessageReaction  = setMessageReaction(ctx);
+    api.unsendMessage       = unsendMessage(ctx);
+    api.deleteMessage       = api.unsendMessage;
+
+    api.changeNickname = (nickname, threadID, participantID, cb) => {
+        const payload = new URLSearchParams({ nickname, thread_id: threadID, participant_user_id: participantID }).toString();
+        ctx.axios.post(`/api/v1/direct_v2/threads/${threadID}/update_title/`, payload, {
+            headers: { ...buildHeaders(ctx), "Content-Type": "application/x-www-form-urlencoded" }
+        }).catch(() => {});
+        if (cb) cb(null);
         return Promise.resolve();
     };
-    
-    api.changeThreadColor = (color, threadID, callback) => {
-        if (callback) callback(null);
+
+    api.setTitle = (newTitle, threadID, cb) => {
+        const payload = new URLSearchParams({ title: newTitle }).toString();
+        ctx.axios.post(`/api/v1/direct_v2/threads/${threadID}/update_title/`, payload, {
+            headers: { ...buildHeaders(ctx), "Content-Type": "application/x-www-form-urlencoded" }
+        }).catch(() => {});
+        if (cb) cb(null);
         return Promise.resolve();
     };
-    
-    api.changeThreadEmoji = (emoji, threadID, callback) => {
-        if (callback) callback(null);
+
+    api.addUserToGroup = (userID, threadID, cb) => {
+        const payload = new URLSearchParams({ user_ids: JSON.stringify([userID.toString()]) }).toString();
+        ctx.axios.post(`/api/v1/direct_v2/threads/${threadID}/add_user/`, payload, {
+            headers: { ...buildHeaders(ctx), "Content-Type": "application/x-www-form-urlencoded" }
+        }).catch(() => {});
+        if (cb) cb(null);
         return Promise.resolve();
     };
-    
-    api.setTitle = (newTitle, threadID, callback) => {
-        if (callback) callback(null);
+
+    api.removeUserFromGroup = (userID, threadID, cb) => {
+        const payload = new URLSearchParams({ user_ids: JSON.stringify([userID.toString()]) }).toString();
+        ctx.axios.post(`/api/v1/direct_v2/threads/${threadID}/remove_users/`, payload, {
+            headers: { ...buildHeaders(ctx), "Content-Type": "application/x-www-form-urlencoded" }
+        }).catch(() => {});
+        if (cb) cb(null);
         return Promise.resolve();
     };
-    
-    api.addUserToGroup = (userID, threadID, callback) => {
-        if (callback) callback(null);
+
+    api.changeAdminStatus = (threadID, adminIDs, adminStatus, cb) => {
+        if (cb) cb(null);
         return Promise.resolve();
     };
-    
-    api.removeUserFromGroup = (userID, threadID, callback) => {
-        if (callback) callback(null);
+
+    api.changeThreadColor = (color, threadID, cb) => {
+        if (cb) cb(null);
         return Promise.resolve();
     };
-    
-    api.changeAdminStatus = (threadID, adminIDs, adminStatus, callback) => {
-        if (callback) callback(null);
+
+    api.changeThreadEmoji = (emoji, threadID, cb) => {
+        if (cb) cb(null);
         return Promise.resolve();
     };
-    
-    api.logout = (callback) => {
+
+    api.logout = (cb) => {
         ctx.loggedIn = false;
         if (ctx.stopListening) ctx.stopListening();
-        if (callback) callback(null);
+        if (cb) cb(null);
         return Promise.resolve();
     };
-    
-    api.getHeaders = () => getHeaders(ctx);
-    api.httpGet = (url, jar) => ctx.axios.get(url);
-    api.httpPost = (url, form, jar) => ctx.axios.post(url, form);
-    
-    api.stopListenMqtt = (callback) => {
-        if (ctx.mqttClient) {
-            ctx.mqttClient.end();
-            ctx.mqttClient = null;
-        }
-        if (callback) callback();
+
+    api.httpGet  = (url) => ctx.axios.get(url, { headers: buildHeaders(ctx) });
+    api.httpPost = (url, data) => ctx.axios.post(url, data, { headers: buildHeaders(ctx) });
+
+    api.stopListenMqtt = (cb) => {
+        if (ctx.stopListening) ctx.stopListening();
+        if (cb) cb();
     };
-    
-    const srcPath = path.join(__dirname, 'src');
+
+    const srcPath = path.join(__dirname, "src");
     if (fs.existsSync(srcPath)) {
         fs.readdirSync(srcPath)
-            .filter(v => v.endsWith('.js'))
+            .filter(v => v.endsWith(".js"))
             .forEach(v => {
-                const funcName = v.replace('.js', '');
-                if (!api[funcName]) {
-                    try {
-                        api[funcName] = require(`./src/${v}`)(ctx, api);
-                    } catch (e) {}
+                const name = v.replace(".js", "");
+                if (!api[name]) {
+                    try { api[name] = require(`./src/${v}`)(ctx, api); } catch (e) {}
                 }
             });
     }
-    
+
     return api;
 }
 
 function parseCookies(cookieData) {
-    let cookies = [];
-    
+    let raw = [];
     if (typeof cookieData === "string") {
-        if (cookieData.trim().startsWith("[")) {
-            try {
-                cookies = JSON.parse(cookieData);
-            } catch (e) {
-                cookies = cookieData.split(";").map(c => {
-                    const [key, ...valueParts] = c.trim().split("=");
-                    return {
-                        key: key?.trim(),
-                        value: valueParts.join("=")?.trim(),
-                        domain: "instagram.com",
-                        path: "/",
-                        hostOnly: false,
-                        creation: new Date().toISOString(),
-                        lastAccessed: new Date().toISOString()
-                    };
-                }).filter(c => c.key && c.value);
-            }
+        const trimmed = cookieData.trim();
+        if (trimmed.startsWith("[")) {
+            try { raw = JSON.parse(trimmed); } catch (e) {}
         } else {
-            cookies = cookieData.split(";").map(c => {
-                const [key, ...valueParts] = c.trim().split("=");
-                return {
-                    key: key?.trim(),
-                    value: valueParts.join("=")?.trim(),
-                    domain: "instagram.com",
-                    path: "/",
-                    hostOnly: false,
-                    creation: new Date().toISOString(),
-                    lastAccessed: new Date().toISOString()
-                };
-            }).filter(c => c.key && c.value);
+            raw = trimmed.split(";").map(c => {
+                const [k, ...v] = c.trim().split("=");
+                return { name: k?.trim(), value: v.join("=")?.trim() };
+            });
         }
     } else if (Array.isArray(cookieData)) {
-        cookies = cookieData.map(c => ({
-            key: c.key || c.name,
-            value: c.value,
-            domain: c.domain || "instagram.com",
-            path: c.path || "/",
-            hostOnly: c.hostOnly || false,
-            creation: c.creation || new Date().toISOString(),
-            lastAccessed: c.lastAccessed || new Date().toISOString()
-        }));
+        raw = cookieData;
     }
-    
-    return cookies.filter(c => c.key && c.value);
+
+    return raw.map(c => ({
+        key   : c.key || c.name,
+        value : c.value,
+        domain: (c.domain || ".instagram.com").replace(/^\.?/, "."),
+        path  : c.path || "/",
+        hostOnly : c.hostOnly || false,
+        creation : c.creation || new Date().toISOString(),
+        lastAccessed: c.lastAccessed || new Date().toISOString()
+    })).filter(c => c.key && c.value);
 }
 
 function login(loginData, options, callback) {
     if (typeof options === "function") {
         callback = options;
-        options = {};
+        options  = {};
     }
-    
+
     const globalOptions = {
-        listenEvents: true,
-        selfListen: false,
-        autoMarkDelivery: true,
-        autoMarkRead: false,
-        autoReconnect: true,
-        updatePresence: false,
-        logLevel: "info",
-        forceLogin: true,
-        userAgent: "Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+        listenEvents      : true,
+        selfListen        : false,
+        autoMarkDelivery  : false,
+        autoMarkRead      : false,
+        autoReconnect     : true,
+        updatePresence    : false,
+        logLevel          : "info",
+        forceLogin        : true,
+        userAgent         : "Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
     };
-    
-    setOptions(globalOptions, options);
-    
+
+    setOptions(globalOptions, options || {});
+
     let resolveFunc, rejectFunc;
     const returnPromise = new Promise((resolve, reject) => {
         resolveFunc = resolve;
-        rejectFunc = reject;
+        rejectFunc  = reject;
     });
-    
+
     if (typeof callback !== "function") {
         callback = (err, api) => {
             if (err) return rejectFunc(err);
             resolveFunc(api);
         };
     }
-    
+
     const appState = loginData.appState || loginData;
-    const cookies = parseCookies(appState);
-    
-    if (!cookies || cookies.length === 0) {
-        const error = new Error("No valid cookies provided. Please provide Instagram cookies in account.txt");
-        callback(error);
-        return returnPromise;
+    const cookies  = parseCookies(appState);
+
+    if (!cookies.length) {
+        return callback(new Error("No valid cookies found in account.txt")), returnPromise;
     }
-    
+
+    let csrfToken = "", sessionID = "", userID = "";
     const jar = new CookieJar();
-    let csrfToken = "";
-    let sessionID = "";
-    let userID = "";
-    
-    for (const cookie of cookies) {
+
+    for (const c of cookies) {
         try {
-            const cookieStr = `${cookie.key}=${cookie.value}; Domain=.instagram.com; Path=/`;
-            jar.setCookieSync(cookieStr, "https://www.instagram.com/");
-            
-            if (cookie.key === "csrftoken") csrfToken = cookie.value;
-            if (cookie.key === "sessionid") sessionID = cookie.value;
-            if (cookie.key === "ds_user_id") userID = cookie.value;
+            jar.setCookieSync(`${c.key}=${c.value}; Domain=.instagram.com; Path=/; Secure`, "https://www.instagram.com");
         } catch (e) {}
+        if (c.key === "csrftoken") csrfToken = c.value;
+        if (c.key === "sessionid") sessionID = c.value;
+        if (c.key === "ds_user_id") userID   = c.value;
     }
-    
-    if (!sessionID) {
-        const error = new Error("Missing sessionid cookie. Please ensure your Instagram cookies include 'sessionid'");
-        callback(error);
-        return returnPromise;
-    }
-    
-    if (!userID) {
-        const error = new Error("Missing ds_user_id cookie. Please ensure your Instagram cookies include 'ds_user_id'");
-        callback(error);
-        return returnPromise;
-    }
-    
+
+    if (!sessionID) return callback(new Error("Missing 'sessionid' cookie in account.txt")), returnPromise;
+    if (!userID)    return callback(new Error("Missing 'ds_user_id' cookie in account.txt")), returnPromise;
+
     const axiosInstance = wrapper(axios.create({
         jar,
-        withCredentials: true,
-        baseURL: "https://www.instagram.com",
-        timeout: 30000,
-        maxRedirects: 5
+        withCredentials : true,
+        baseURL         : IG_BASE_URL,
+        timeout         : 30000,
+        maxRedirects    : 5
     }));
-    
-    let lastRequestTime = 0;
-    const MIN_REQUEST_DELAY = 1000;
-    
-    axiosInstance.interceptors.request.use(async (config) => {
-        const now = Date.now();
-        const timeSinceLastRequest = now - lastRequestTime;
-        if (timeSinceLastRequest < MIN_REQUEST_DELAY) {
-            await new Promise(resolve => setTimeout(resolve, MIN_REQUEST_DELAY - timeSinceLastRequest));
-        }
-        lastRequestTime = Date.now();
-        config.headers = { ...config.headers, ...getHeaders(ctx) };
-        return config;
-    }, (error) => {
-        return Promise.reject(error);
-    });
-    
-    axiosInstance.interceptors.response.use(
-        (response) => response,
-        async (error) => {
-            if (error.response?.status === 429) {
-                console.log("[ig-chat-api] Rate limit detected - cooling down");
-            }
-            return Promise.reject(error);
-        }
-    );
-    
+
     const ctx = {
-        userID: userID,
-        jar: jar,
-        axios: axiosInstance,
-        csrfToken: csrfToken,
-        sessionID: sessionID,
-        appState: cookies,
-        globalOptions: globalOptions,
-        loggedIn: true,
-        clientID: Math.random().toString(36).substring(2),
-        wwwClaim: "0",
-        mqttClient: null,
+        userID,
+        username  : "",
+        jar,
+        axios     : axiosInstance,
+        csrfToken,
+        sessionID,
+        appState  : cookies,
+        globalOptions,
+        loggedIn  : true,
+        clientID  : Math.random().toString(36).substring(2),
+        wwwClaim  : "0",
         stopListening: null
     };
-    
-    axiosInstance.defaults.headers.common = getHeaders(ctx);
-    
+
+    const headers = buildHeaders(ctx);
+    axiosInstance.defaults.headers.common = headers;
+
     console.log("[ig-chat-api] Validating Instagram session...");
-    
-    axiosInstance.get("/api/v1/accounts/current_user/", {
-        headers: getHeaders(ctx)
-    })
-    .then(response => {
-        if (response.data && response.data.user) {
-            const user = response.data.user;
-            console.log(`[ig-chat-api] ✓ Logged in as: ${user.username} (ID: ${user.pk})`);
-            ctx.userID = user.pk.toString();
-            ctx.username = user.username;
-            const api = buildAPI(ctx);
-            callback(null, api);
-        } else {
-            throw new Error("Invalid session");
-        }
-    })
-    .catch(error => {
-        console.log("[ig-chat-api] Session validation via API failed, trying web endpoint...");
-        
-        axiosInstance.get("/", {
-            headers: {
-                ...getHeaders(ctx),
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
-            }
-        })
-        .then(response => {
-            const html = response.data;
-            
-            const csrfMatch = html.match(/"csrf_token":"([^"]+)"/);
-            if (csrfMatch) {
-                ctx.csrfToken = csrfMatch[1];
-            }
-            
-            const userMatch = html.match(/"username":"([^"]+)"/);
-            if (userMatch) {
-                ctx.username = userMatch[1];
-            }
-            
-            if (ctx.userID) {
-                console.log(`[ig-chat-api] ✓ Session validated for user ID: ${ctx.userID}`);
-                if (ctx.username) {
-                    console.log(`[ig-chat-api] ✓ Username: ${ctx.username}`);
+
+    const tryValidate = async () => {
+        const endpoints = [
+            { url: "/api/v1/accounts/current_user/?edit=true", extract: (d) => d?.user?.pk?.toString() },
+            { url: "/api/v1/direct_v2/inbox/?limit=1",         extract: (d) => d?.inbox ? userID : null },
+            { url: "/api/v1/news/inbox/",                       extract: (d) => d?.status === "ok" ? userID : null }
+        ];
+
+        for (const ep of endpoints) {
+            try {
+                const r = await axiosInstance.get(ep.url, { headers: buildHeaders(ctx) });
+                const uid = ep.extract(r.data);
+                if (uid) {
+                    if (r.data?.user?.username) ctx.username = r.data.user.username;
+                    if (uid !== userID) ctx.userID = uid;
+                    return true;
                 }
-                const api = buildAPI(ctx);
-                callback(null, api);
-            } else {
-                const error = new Error("Could not validate Instagram session. Please check your cookies.");
-                callback(error);
+            } catch (e) {
+                if (e.response?.status === 401 || e.response?.status === 403) {
+                    return false;
+                }
             }
-        })
-        .catch(err => {
-            console.log("[ig-chat-api] Proceeding with provided credentials...");
-            const api = buildAPI(ctx);
-            callback(null, api);
-        });
+        }
+
+        console.log("[ig-chat-api] Warning: Could not fully validate session, proceeding anyway...");
+        return true;
+    };
+
+    tryValidate().then(ok => {
+        if (!ok) {
+            return callback(new Error("Instagram session is invalid or expired. Please update your cookies in account.txt."));
+        }
+        console.log(`[ig-chat-api] ✓ Session OK — userID: ${ctx.userID}${ctx.username ? " (@" + ctx.username + ")" : ""}`);
+        const api = buildAPI(ctx);
+        callback(null, api);
+    }).catch(err => {
+        console.log("[ig-chat-api] Proceeding with provided session (validation error)...");
+        const api = buildAPI(ctx);
+        callback(null, api);
     });
-    
+
     return returnPromise;
 }
 
