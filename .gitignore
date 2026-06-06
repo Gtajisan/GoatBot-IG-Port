@@ -1,4 +1,7 @@
 node_modules
+
+account.txt
+session.json
 fb-chat-api.dev
 obfcode.js
 minify.js

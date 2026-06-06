@@ -1,46 +1,56 @@
 "use strict";
 
-const fs = require("fs");
+/**
+ * ig-chat-api — GoatBot Instagram API
+ *
+ * Supports two login modes:
+ *   1. Email/Password  →  login({ username, password }, opts, cb)
+ *   2. Cookies (legacy) → login({ appState }, opts, cb)
+ *
+ * Password login uses Instagram's private mobile API (same approach as instagrapi).
+ * On success the session is persisted so subsequent boots skip re-authentication.
+ */
+
+const fs   = require("fs");
 const path = require("path");
 const axios = require("axios");
 const { CookieJar } = require("tough-cookie");
-const { wrapper } = require("axios-cookiejar-support");
-const EventEmitter = require("events");
+const { wrapper }   = require("axios-cookiejar-support");
+const EventEmitter  = require("events");
 
-const sendMessage      = require("./src/sendMessage");
-const listenMqtt       = require("./src/listenMqtt");
-const getUserInfo      = require("./src/getUserInfo");
-const getThreadInfo    = require("./src/getThreadInfo");
-const getThreadList    = require("./src/getThreadList");
-const getThreadHistory = require("./src/getThreadHistory");
-const markAsRead       = require("./src/markAsRead");
+const { passwordLogin } = require("./src/auth/passwordLogin");
+
+const sendMessage         = require("./src/sendMessage");
+const listenMqtt          = require("./src/listenMqtt");
+const getUserInfo         = require("./src/getUserInfo");
+const getThreadInfo       = require("./src/getThreadInfo");
+const getThreadList       = require("./src/getThreadList");
+const getThreadHistory    = require("./src/getThreadHistory");
+const markAsRead          = require("./src/markAsRead");
 const sendTypingIndicator = require("./src/sendTypingIndicator");
 const setMessageReaction  = require("./src/setMessageReaction");
 const getCurrentUserID    = require("./src/getCurrentUserID");
 const unsendMessage       = require("./src/unsendMessage");
 
-/* ─────────────────────────────────────────────
-   Instagram Web API constants
-───────────────────────────────────────────── */
-const IG_APP_ID    = "936619743392459";
-const IG_BASE_URL  = "https://www.instagram.com";
+const IG_APP_ID   = "936619743392459";
+const IG_BASE_URL = "https://www.instagram.com";
 
 function buildHeaders(ctx) {
     return {
-        "User-Agent"        : ctx.globalOptions.userAgent,
-        "Accept"            : "*/*",
-        "Accept-Language"   : "en-US,en;q=0.9",
-        "Accept-Encoding"   : "gzip, deflate, br",
-        "X-IG-App-ID"       : IG_APP_ID,
-        "X-ASBD-ID"         : "129477",
-        "X-IG-WWW-Claim"    : ctx.wwwClaim || "0",
-        "X-Requested-With"  : "XMLHttpRequest",
-        "X-CSRFToken"       : ctx.csrfToken || "",
-        "Origin"            : IG_BASE_URL,
-        "Referer"           : `${IG_BASE_URL}/direct/inbox/`,
-        "Sec-Fetch-Dest"    : "empty",
-        "Sec-Fetch-Mode"    : "cors",
-        "Sec-Fetch-Site"    : "same-origin"
+        "User-Agent"       : ctx.globalOptions.userAgent,
+        "Accept"           : "*/*",
+        "Accept-Language"  : "en-US,en;q=0.9",
+        "Accept-Encoding"  : "gzip, deflate, br",
+        "X-IG-App-ID"      : IG_APP_ID,
+        "X-ASBD-ID"        : "129477",
+        "X-IG-WWW-Claim"   : ctx.wwwClaim || "0",
+        "X-Requested-With" : "XMLHttpRequest",
+        "X-CSRFToken"      : ctx.csrfToken || "",
+        "Origin"           : IG_BASE_URL,
+        "Referer"          : `${IG_BASE_URL}/direct/inbox/`,
+        "Sec-Fetch-Dest"   : "empty",
+        "Sec-Fetch-Mode"   : "cors",
+        "Sec-Fetch-Site"   : "same-origin"
     };
 }
 
@@ -58,11 +68,11 @@ function setOptions(globalOptions, options) {
 function buildAPI(ctx) {
     const api = new EventEmitter();
 
-    api.setOptions          = (opts)  => setOptions(ctx.globalOptions, opts);
-    api.getAppState         = ()      => ctx.appState;
-    api.getHeaders          = ()      => buildHeaders(ctx);
+    api.setOptions          = (opts) => setOptions(ctx.globalOptions, opts);
+    api.getAppState         = ()     => ctx.appState;
+    api.getHeaders          = ()     => buildHeaders(ctx);
     api.getCurrentUserID    = getCurrentUserID(ctx);
-    api.getUserID           = ()      => ctx.userID;
+    api.getUserID           = ()     => ctx.userID;
 
     api.sendMessage         = sendMessage(ctx, api);
     api.listenMqtt          = listenMqtt(ctx, api);
@@ -114,20 +124,9 @@ function buildAPI(ctx) {
         return Promise.resolve();
     };
 
-    api.changeAdminStatus = (threadID, adminIDs, adminStatus, cb) => {
-        if (cb) cb(null);
-        return Promise.resolve();
-    };
-
-    api.changeThreadColor = (color, threadID, cb) => {
-        if (cb) cb(null);
-        return Promise.resolve();
-    };
-
-    api.changeThreadEmoji = (emoji, threadID, cb) => {
-        if (cb) cb(null);
-        return Promise.resolve();
-    };
+    api.changeAdminStatus  = (threadID, adminIDs, adminStatus, cb) => { if (cb) cb(null); return Promise.resolve(); };
+    api.changeThreadColor  = (color, threadID, cb)                   => { if (cb) cb(null); return Promise.resolve(); };
+    api.changeThreadEmoji  = (emoji, threadID, cb)                   => { if (cb) cb(null); return Promise.resolve(); };
 
     api.logout = (cb) => {
         ctx.loggedIn = false;
@@ -136,7 +135,7 @@ function buildAPI(ctx) {
         return Promise.resolve();
     };
 
-    api.httpGet  = (url) => ctx.axios.get(url, { headers: buildHeaders(ctx) });
+    api.httpGet  = (url)       => ctx.axios.get(url,  { headers: buildHeaders(ctx) });
     api.httpPost = (url, data) => ctx.axios.post(url, data, { headers: buildHeaders(ctx) });
 
     api.stopListenMqtt = (cb) => {
@@ -178,14 +177,117 @@ function parseCookies(cookieData) {
     }
 
     return raw.map(c => ({
-        key   : c.key || c.name,
-        value : c.value,
-        domain: (c.domain || ".instagram.com").replace(/^\.?/, "."),
-        path  : c.path || "/",
-        hostOnly : c.hostOnly || false,
-        creation : c.creation || new Date().toISOString(),
+        key         : c.key || c.name,
+        value       : c.value,
+        domain      : (c.domain || ".instagram.com").replace(/^\.?/, "."),
+        path        : c.path || "/",
+        hostOnly    : c.hostOnly || false,
+        creation    : c.creation || new Date().toISOString(),
         lastAccessed: c.lastAccessed || new Date().toISOString()
     })).filter(c => c.key && c.value);
+}
+
+function buildContextFromCookies(cookies, globalOptions) {
+    let csrfToken = "", sessionID = "", userID = "";
+    const jar = new CookieJar();
+
+    for (const c of cookies) {
+        try {
+            jar.setCookieSync(
+                `${c.key}=${c.value}; Domain=.instagram.com; Path=/; Secure`,
+                "https://www.instagram.com"
+            );
+        } catch (e) {}
+        if (c.key === "csrftoken") csrfToken = c.value;
+        if (c.key === "sessionid") sessionID = c.value;
+        if (c.key === "ds_user_id") userID   = c.value;
+    }
+
+    const axiosInstance = wrapper(axios.create({
+        jar,
+        withCredentials: true,
+        baseURL        : IG_BASE_URL,
+        timeout        : 30000,
+        maxRedirects   : 5
+    }));
+
+    const ctx = {
+        userID,
+        username : "",
+        jar,
+        axios    : axiosInstance,
+        csrfToken,
+        sessionID,
+        appState : cookies,
+        globalOptions,
+        loggedIn : true,
+        clientID : Math.random().toString(36).substring(2),
+        wwwClaim : "0",
+        stopListening: null
+    };
+
+    axiosInstance.defaults.headers.common = buildHeaders(ctx);
+    return ctx;
+}
+
+function buildContextFromPasswordResult(result, globalOptions) {
+    const { userID, username, csrfToken, sessionID, appState, jar,
+            deviceID, androidID, phoneID, uuid } = result;
+
+    const axiosInstance = wrapper(axios.create({
+        jar,
+        withCredentials: true,
+        baseURL        : IG_BASE_URL,
+        timeout        : 30000,
+        maxRedirects   : 5
+    }));
+
+    const ctx = {
+        userID,
+        username,
+        jar,
+        axios    : axiosInstance,
+        csrfToken,
+        sessionID,
+        appState,
+        globalOptions,
+        loggedIn : true,
+        clientID : uuid || Math.random().toString(36).substring(2),
+        wwwClaim : "0",
+        stopListening: null,
+        deviceID,
+        androidID,
+        phoneID
+    };
+
+    axiosInstance.defaults.headers.common = buildHeaders(ctx);
+    return ctx;
+}
+
+async function validateSession(ctx) {
+    const endpoints = [
+        { url: "/api/v1/accounts/current_user/?edit=true", extract: (d) => d?.user?.pk?.toString() },
+        { url: "/api/v1/direct_v2/inbox/?limit=1",         extract: (d) => d?.inbox ? ctx.userID : null },
+        { url: "/api/v1/news/inbox/",                       extract: (d) => d?.status === "ok" ? ctx.userID : null }
+    ];
+
+    for (const ep of endpoints) {
+        try {
+            const r = await ctx.axios.get(ep.url, { headers: buildHeaders(ctx) });
+            const uid = ep.extract(r.data);
+            if (uid) {
+                if (r.data?.user?.username) ctx.username = r.data.user.username;
+                if (uid !== ctx.userID && uid) ctx.userID = uid;
+                return true;
+            }
+        } catch (e) {
+            if (e.response?.status === 401 || e.response?.status === 403) {
+                return false;
+            }
+        }
+    }
+
+    return null;
 }
 
 function login(loginData, options, callback) {
@@ -195,15 +297,15 @@ function login(loginData, options, callback) {
     }
 
     const globalOptions = {
-        listenEvents      : true,
-        selfListen        : false,
-        autoMarkDelivery  : false,
-        autoMarkRead      : false,
-        autoReconnect     : true,
-        updatePresence    : false,
-        logLevel          : "info",
-        forceLogin        : true,
-        userAgent         : "Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+        listenEvents     : true,
+        selfListen       : false,
+        autoMarkDelivery : false,
+        autoMarkRead     : false,
+        autoReconnect    : true,
+        updatePresence   : false,
+        logLevel         : "info",
+        forceLogin       : true,
+        userAgent        : "Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
     };
 
     setOptions(globalOptions, options || {});
@@ -221,98 +323,62 @@ function login(loginData, options, callback) {
         };
     }
 
-    const appState = loginData.appState || loginData;
-    const cookies  = parseCookies(appState);
+    const hasCredentials = loginData.username && loginData.password;
+    const hasCookies     = loginData.appState || (Array.isArray(loginData) && loginData.length > 0);
 
-    if (!cookies.length) {
-        return callback(new Error("No valid cookies found in account.txt")), returnPromise;
-    }
-
-    let csrfToken = "", sessionID = "", userID = "";
-    const jar = new CookieJar();
-
-    for (const c of cookies) {
+    (async () => {
         try {
-            jar.setCookieSync(`${c.key}=${c.value}; Domain=.instagram.com; Path=/; Secure`, "https://www.instagram.com");
-        } catch (e) {}
-        if (c.key === "csrftoken") csrfToken = c.value;
-        if (c.key === "sessionid") sessionID = c.value;
-        if (c.key === "ds_user_id") userID   = c.value;
-    }
+            let ctx;
 
-    if (!sessionID) return callback(new Error("Missing 'sessionid' cookie in account.txt")), returnPromise;
-    if (!userID)    return callback(new Error("Missing 'ds_user_id' cookie in account.txt")), returnPromise;
+            if (hasCredentials) {
+                console.log("[ig-chat-api] Using email/password login...");
+                const result = await passwordLogin(loginData.username, loginData.password, null);
+                ctx = buildContextFromPasswordResult(result, globalOptions);
+                console.log(`[ig-chat-api] ✓ Logged in as @${ctx.username} (ID: ${ctx.userID})`);
 
-    const axiosInstance = wrapper(axios.create({
-        jar,
-        withCredentials : true,
-        baseURL         : IG_BASE_URL,
-        timeout         : 30000,
-        maxRedirects    : 5
-    }));
+            } else if (hasCookies) {
+                console.log("[ig-chat-api] Using cookie session...");
+                const appState = loginData.appState || loginData;
+                const cookies  = parseCookies(appState);
 
-    const ctx = {
-        userID,
-        username  : "",
-        jar,
-        axios     : axiosInstance,
-        csrfToken,
-        sessionID,
-        appState  : cookies,
-        globalOptions,
-        loggedIn  : true,
-        clientID  : Math.random().toString(36).substring(2),
-        wwwClaim  : "0",
-        stopListening: null
-    };
-
-    const headers = buildHeaders(ctx);
-    axiosInstance.defaults.headers.common = headers;
-
-    console.log("[ig-chat-api] Validating Instagram session...");
-
-    const tryValidate = async () => {
-        const endpoints = [
-            { url: "/api/v1/accounts/current_user/?edit=true", extract: (d) => d?.user?.pk?.toString() },
-            { url: "/api/v1/direct_v2/inbox/?limit=1",         extract: (d) => d?.inbox ? userID : null },
-            { url: "/api/v1/news/inbox/",                       extract: (d) => d?.status === "ok" ? userID : null }
-        ];
-
-        for (const ep of endpoints) {
-            try {
-                const r = await axiosInstance.get(ep.url, { headers: buildHeaders(ctx) });
-                const uid = ep.extract(r.data);
-                if (uid) {
-                    if (r.data?.user?.username) ctx.username = r.data.user.username;
-                    if (uid !== userID) ctx.userID = uid;
-                    return true;
+                if (!cookies.length) {
+                    return callback(new Error("No valid cookies found. Switch to email/password login."));
                 }
-            } catch (e) {
-                if (e.response?.status === 401 || e.response?.status === 403) {
-                    return false;
+
+                const sessionID = cookies.find(c => c.key === "sessionid");
+                const userIDCk  = cookies.find(c => c.key === "ds_user_id");
+
+                if (!sessionID) return callback(new Error("Missing 'sessionid' cookie. Use email/password login instead."));
+                if (!userIDCk)  return callback(new Error("Missing 'ds_user_id' cookie. Use email/password login instead."));
+
+                ctx = buildContextFromCookies(cookies, globalOptions);
+
+                const valid = await validateSession(ctx);
+                if (valid === false) {
+                    return callback(new Error("Cookie session is expired (HTTP 401/403). Switch to email/password login in account.txt."));
                 }
+
+                console.log(`[ig-chat-api] ✓ Cookie session OK — userID: ${ctx.userID}${ctx.username ? " (@" + ctx.username + ")" : ""}`);
+
+            } else {
+                return callback(new Error(
+                    "No login credentials provided.\n" +
+                    "Set username+password in account.txt:\n" +
+                    "  username=your_instagram_username\n" +
+                    "  password=your_instagram_password"
+                ));
             }
-        }
 
-        console.log("[ig-chat-api] Warning: Could not fully validate session, proceeding anyway...");
-        return true;
-    };
+            const api = buildAPI(ctx);
+            callback(null, api);
 
-    tryValidate().then(ok => {
-        if (!ok) {
-            return callback(new Error("Instagram session is invalid or expired. Please update your cookies in account.txt."));
+        } catch (err) {
+            callback(err);
         }
-        console.log(`[ig-chat-api] ✓ Session OK — userID: ${ctx.userID}${ctx.username ? " (@" + ctx.username + ")" : ""}`);
-        const api = buildAPI(ctx);
-        callback(null, api);
-    }).catch(err => {
-        console.log("[ig-chat-api] Proceeding with provided session (validation error)...");
-        const api = buildAPI(ctx);
-        callback(null, api);
-    });
+    })();
 
     return returnPromise;
 }
 
-module.exports = login;
-module.exports.login = login;
+module.exports        = login;
+module.exports.login  = login;
