@@ -1,23 +1,23 @@
-# 🐐 GoatBot V2 — Instagram Port
+# GoatBot V2 — Instagram Port
 
 A fully-featured Instagram DM bot powered by GoatBot V2's plug-and-play command/event system.  
 Built by **Gtajisan**, based on [NTKhang's GoatBot V2](https://github.com/ntkhang03/Goat-Bot-V2).
 
 ---
 
-## ✨ Features
+## Features
 
-- 📨 Responds to Instagram Direct Messages & Group Chats
-- 🔐 **Email/Password login** — no more expired cookie headaches
-- 🔄 Auto session restore — re-login only when truly needed
-- 🧩 Plug-and-play commands & events (drop a `.js` file, it loads automatically)
-- 🗄️ JSON / SQLite / MongoDB database support
-- 🖥️ Optional web dashboard
-- 🤖 Built-in AI, economy, moderation, and more
+- Responds to Instagram Direct Messages & Group Chats
+- **Email/Password login** — no more expired cookie headaches
+- Auto session restore — re-login only when truly needed
+- Plug-and-play commands & events (drop a `.js` file, it loads automatically)
+- JSON / SQLite / MongoDB database support
+- Optional web dashboard
+- Built-in AI, economy, moderation, and more
 
 ---
 
-## 📋 Requirements
+## Requirements
 
 | Tool | Minimum Version |
 |------|----------------|
@@ -27,11 +27,11 @@ Built by **Gtajisan**, based on [NTKhang's GoatBot V2](https://github.com/ntkhan
 
 ---
 
-## 🚀 Quick Setup — Replit
+## Quick Setup — Replit
 
 ### Step 1 — Add your credentials as Secrets
 
-In your Replit project open the **Secrets** panel (🔒 lock icon in the sidebar) and add:
+In your Replit project open the **Secrets** panel (lock icon in the sidebar) and add:
 
 | Key | Value |
 |-----|-------|
@@ -48,7 +48,7 @@ The bot will log in, load all commands, and start listening for messages.
 
 ---
 
-## 🚀 Quick Setup — Local / VPS
+## Quick Setup — Local / VPS
 
 ### Step 1 — Clone and install
 
@@ -92,15 +92,15 @@ node index.js
 
 ---
 
-## 🔑 Login Methods — Priority Order
+## Login Methods — Priority Order
 
 The bot tries each method in sequence and uses the first one that succeeds:
 
 ```
-1️⃣  IG_USERNAME + IG_PASSWORD  environment variables  (Replit Secrets / system env)
-2️⃣  username + password        in account.txt
-3️⃣  Saved session              session.json           (auto-restored from last login)
-4️⃣  Cookie array               account.txt legacy     (expires often — not recommended)
+1. IG_USERNAME + IG_PASSWORD  environment variables  (Replit Secrets / system env)
+2. username + password        in account.txt
+3. Saved session              session.json           (auto-restored from last login)
+4. Cookie array               account.txt legacy     (expires often — not recommended)
 ```
 
 ### Option A — Environment Variables (best for Replit / cloud)
@@ -125,7 +125,7 @@ password=your_instagram_password
 
 ---
 
-## 🔒 Two-Factor Authentication (2FA)
+## Two-Factor Authentication (2FA)
 
 ### Interactive mode (local terminal)
 
@@ -144,7 +144,7 @@ IG_2FA_CODE=123456
 
 ---
 
-## ⚠️ Login Challenge / Checkpoint
+## Login Challenge / Checkpoint
 
 Instagram sometimes requires account verification when it detects a new IP or device.
 
@@ -161,7 +161,7 @@ Instagram sometimes requires account verification when it detects a new IP or de
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 GoatBot-IG-Port/
@@ -201,7 +201,7 @@ GoatBot-IG-Port/
 
 ---
 
-## ⚙️ config.json Reference
+## config.json Reference
 
 ```jsonc
 {
@@ -245,7 +245,7 @@ GoatBot-IG-Port/
 
 ---
 
-## 🧩 Adding a Command
+## Adding a Command
 
 Create a file in `scripts/cmds/yourcommand.js`:
 
@@ -264,7 +264,7 @@ module.exports = {
   },
 
   onStart: async function ({ api, event, args }) {
-    await api.sendMessage("Hello! 👋", event.threadID, event.messageID);
+    await api.sendMessage("Hello!", event.threadID, event.messageID);
   }
 };
 ```
@@ -273,7 +273,7 @@ The bot picks it up automatically on next start (or immediately if `autoLoadScri
 
 ---
 
-## 🧩 Adding an Event
+## Adding an Event
 
 Create a file in `scripts/events/myevent.js`:
 
@@ -295,7 +295,7 @@ module.exports = {
 
 ---
 
-## 🗄️ Database Options
+## Database Options
 
 ### JSON (default — no setup)
 
@@ -328,31 +328,31 @@ Get a free hosted database at [MongoDB Atlas](https://www.mongodb.com/atlas).
 
 ---
 
-## 🛠️ Troubleshooting
+## Troubleshooting
 
-### ❌ "All login methods failed"
+### "All login methods failed"
 - Check `account.txt` — make sure username and password are correct
 - Ensure the account is not locked or suspended on Instagram
 - Try logging into `instagram.com` from a browser on the same IP first
 
-### ❌ "Checkpoint required"
+### "Checkpoint required"
 - Open the Instagram app on your phone and approve the login alert
 - Or set `IG_CHECKPOINT_CODE=<code from email/SMS>` and restart
 
-### ❌ Rate limited / 429 errors
+### Rate limited / 429 errors
 - Wait 5–10 minutes and retry
 - Increase `instagramPolling.minDelay` in `config.json` (e.g. `10000` = 10 seconds)
 
-### ❌ Session keeps expiring
+### Session keeps expiring
 - You are using cookie login — switch to **username/password** in `account.txt`
 - The bot will re-authenticate automatically when the session expires
 - Delete `session.json` to force a fresh login immediately
 
-### ❌ 2FA code rejected in non-interactive mode
+### 2FA code rejected in non-interactive mode
 - Make sure `IG_2FA_CODE` is set **before** starting the bot, not after
 - TOTP codes expire in 30 seconds — set the env var just before running
 
-### ❌ Canvas / image commands broken
+### Canvas / image commands broken
 - The `canvas` package needs native graphics libraries
 - **Replit:** already configured in `replit.nix` — no action needed
 - **Ubuntu/Debian:**
@@ -362,7 +362,7 @@ Get a free hosted database at [MongoDB Atlas](https://www.mongodb.com/atlas).
 
 ---
 
-## 🔒 Security Checklist
+## Security Checklist
 
 - [ ] `account.txt` is in `.gitignore` — never commit real credentials
 - [ ] `session.json` is in `.gitignore` — contains active session cookies
@@ -372,13 +372,13 @@ Get a free hosted database at [MongoDB Atlas](https://www.mongodb.com/atlas).
 
 ---
 
-## 📜 License
+## License
 
 MIT — see [LICENSE](LICENSE)
 
 ---
 
-## 🙏 Credits
+## Credits
 
 | Contributor | Role |
 |-------------|------|
