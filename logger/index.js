@@ -2,13 +2,14 @@ const winston = require('winston');
 require('winston-daily-rotate-file');
 const path = require('path');
 const fs = require('fs');
+const axios = require('axios');
 const { colors } = require('../func/colors.js');
 
 const logDir = path.join(process.cwd(), 'logs');
 
 // Ensure log directory exists
 if (!fs.existsSync(logDir)) {
-    fs.mkdirSync(logDir);
+    fs.mkdirSync(logDir, { recursive: true });
 }
 
 // Load config to get log levels and options
@@ -24,6 +25,7 @@ try {
 
 const logLevel = config.logging?.logLevel || 'info';
 const logToFile = config.logging?.logToFile !== false;
+const webhookUrl = config.logging?.webhookUrl || process.env.LOG_WEBHOOK_URL;
 
 // Define log levels
 const levels = {
@@ -45,14 +47,19 @@ const levelColors = {
 
 // Custom format for console
 const consoleFormat = winston.format.combine(
-    winston.format.timestamp({ format: 'HH:mm:ss DD/MM/YYYY' }),
+    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
     winston.format.printf(({ timestamp, level, message, tag, ...meta }) => {
-        const colorizer = colors[levelColors[level]] || (text => text);
-        const tagStr = tag ? colorizer(` [${tag}]`) : '';
+        const levelColor = levelColors[level];
+        const boldColorizer = (colors.bold && colors.bold[levelColor]) ? colors.bold[levelColor] : (text => text);
+
+        const tagStr = tag ? boldColorizer(`[${tag}]`) : '';
+        const levelStr = boldColorizer(level.toUpperCase().padEnd(7));
+
         // Only include non-internal metadata
         const metaEntries = Object.entries(meta).filter(([key]) => !['timestamp', 'level', 'tag'].includes(key));
-        const metaStr = metaEntries.length ? ` ${JSON.stringify(Object.fromEntries(metaEntries))}` : '';
-        return `${colors.gray(timestamp)} ${colorizer(level.toUpperCase())}${tagStr}: ${message}${metaStr}`;
+        const metaStr = metaEntries.length ? `\n${colors.gray(JSON.stringify(Object.fromEntries(metaEntries), null, 2))}` : '';
+
+        return `${colors.gray(timestamp)} ${levelStr} ${tagStr} ${message}${metaStr}`;
     })
 );
 
@@ -61,6 +68,26 @@ const fileFormat = winston.format.combine(
     winston.format.timestamp(),
     winston.format.json()
 );
+
+// Custom transport for Webhook
+class WebhookTransport extends winston.Transport {
+    constructor(opts) {
+        super(opts);
+        this.url = opts.url;
+    }
+
+    log(info, callback) {
+        setImmediate(() => {
+            this.emit('logged', info);
+        });
+
+        if (this.url) {
+            axios.post(this.url, info).catch(() => {});
+        }
+
+        callback();
+    }
+}
 
 const transports = [
     new winston.transports.Console({
@@ -73,11 +100,11 @@ if (logToFile) {
     transports.push(
         new winston.transports.DailyRotateFile({
             level: 'info',
-            filename: path.join(logDir, 'application-%DATE%.log'),
+            filename: path.join(logDir, 'combined-%DATE%.log'),
             datePattern: 'YYYY-MM-DD',
             zippedArchive: true,
-            maxSize: '20m',
-            maxFiles: '14d',
+            maxSize: config.logging?.maxSize || '20m',
+            maxFiles: config.logging?.maxFiles || '14d',
             format: fileFormat,
         }),
         new winston.transports.DailyRotateFile({
@@ -85,11 +112,18 @@ if (logToFile) {
             filename: path.join(logDir, 'error-%DATE%.log'),
             datePattern: 'YYYY-MM-DD',
             zippedArchive: true,
-            maxSize: '20m',
-            maxFiles: '14d',
+            maxSize: config.logging?.maxSize || '20m',
+            maxFiles: config.logging?.maxFiles || '14d',
             format: fileFormat,
         })
     );
+}
+
+if (webhookUrl) {
+    transports.push(new WebhookTransport({
+        level: 'warn', // Only send warns and errors to webhook by default
+        url: webhookUrl
+    }));
 }
 
 const logger = winston.createLogger({

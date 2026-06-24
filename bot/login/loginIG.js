@@ -267,11 +267,11 @@ async function attemptLogin(loginData, loginOptions, label) {
 
     api.listenMqtt(async (err, event) => {
         if (err) {
-            log.error("LISTEN", `Listener error: ${err.message || err}`);
+            log.error("LISTEN", `Listener error: ${err.message || err}`, { error: err });
 
-            const is401 = err.response?.status === 401 || err.response?.status === 403;
+            const is401 = err.response?.status === 401 || err.response?.status === 403 || (err.message && err.message.includes('401'));
             if (is401) {
-                log.error("LISTEN", "Session expired! Deleting session.json — bot will re-login on next start.");
+                log.error("LISTEN", "Session expired or unauthorized! Deleting session.json — bot will re-login on next start.");
                 try { fs.unlinkSync(SESSION_PATH); } catch (_) {}
             }
 
@@ -287,13 +287,19 @@ async function attemptLogin(loginData, loginOptions, label) {
             return;
         }
 
+        if (!event) return;
+
         try {
-            // Use withBackoff for robust event handling
+            // Use withBackoff for robust event handling to survive transient network issues
             await global.utils.withBackoff(async () => {
                 await handler(event);
-            });
+            }, 3, 500);
         } catch (e) {
-            log.error("HANDLER", `Unhandled error in event handler: ${e.message}`, { stack: e.stack });
+            log.error("HANDLER", `Critical error in event handler: ${e.message}`, {
+                stack: e.stack,
+                eventType: event.type,
+                threadID: event.threadID
+            });
         }
     });
 

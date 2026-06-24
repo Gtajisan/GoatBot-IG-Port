@@ -18,23 +18,27 @@ module.exports = (api, threadModel, userModel, dashBoardModel, globalModel, user
 		// Add human-like delay and typing indicator for realism
 		const { config } = global.GoatBot;
 		if (config.humanDelay?.enable !== false && (event.type === "message" || event.type === "message_reply")) {
-			const min = config.humanDelay?.min || 500;
-			const max = config.humanDelay?.max || 2000;
-
 			// Optional typing indicator
 			if (config.humanDelay?.typingIndicator !== false) {
 				api.sendTypingIndicator(event.threadID, (err) => {
-					if (err) global.utils.log.warn("TYPING", `Could not send typing indicator: ${err.message}`);
+					if (err) global.utils.log.debug("TYPING", `Could not send typing indicator: ${err.message}`);
 				});
 			}
 
-			await global.utils.humanDelay(min, max);
+			// Read receipt
+			if (config.humanDelay?.readReceipt !== false && event.messageID) {
+				api.markAsRead(event.threadID, (err) => {
+					if (err) global.utils.log.debug("READ", `Could not mark as read: ${err.message}`);
+				});
+			}
+
+			await global.utils.humanDelay();
 		}
 
-		// Send read receipt if enabled
-		if (config.optionsFca?.autoMarkRead && event.messageID) {
+		// Legacy markAsRead support
+		if (!config.humanDelay?.enable && config.optionsFca?.autoMarkRead && event.messageID) {
 			api.markAsRead(event.threadID, (err) => {
-				if (err) global.utils.log.warn("READ", `Could not mark as read: ${err.message}`);
+				if (err) global.utils.log.debug("READ", `Could not mark as read: ${err.message}`);
 			});
 		}
 

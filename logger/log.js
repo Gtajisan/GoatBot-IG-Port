@@ -1,53 +1,58 @@
 const logger = require('./index.js');
-const { colors } = require('../func/colors.js');
 
-function formatMessage(prefix, message) {
-    if (message === undefined) {
-        return { tag: 'SYSTEM', msg: prefix };
+/**
+ * Robust bridge to the central Winston logger.
+ * Supports:
+ *   - log.info("TAG", "Message", { meta: 'data' })
+ *   - log.info("Message only")
+ *   - log.info("TAG", "Message with %s formatting", "args")
+ */
+function formatAndLog(level, args) {
+    let tag = '';
+    let message = '';
+    let meta = {};
+
+    if (args.length === 1) {
+        message = args[0];
+    } else if (args.length >= 2) {
+        if (typeof args[0] === 'string' && (args[0] === args[0].toUpperCase() || args[0].length < 15)) {
+            tag = args[0];
+            message = args[1];
+            if (args.length > 2) {
+                if (typeof args[2] === 'object' && !Array.isArray(args[2])) {
+                    meta = args[2];
+                } else {
+                    // Treat remaining args as format parameters or just meta
+                    meta = { details: args.slice(2) };
+                }
+            }
+        } else {
+            message = args[0];
+            meta = args[1];
+        }
     }
-    return { tag: prefix, msg: message };
+
+    logger.log({
+        level,
+        tag,
+        message: typeof message === 'object' ? JSON.stringify(message, null, 2) : String(message),
+        ...meta
+    });
 }
 
-module.exports = {
-    err: (prefix, message, ...args) => {
-        const { tag, msg } = formatMessage(prefix, message);
-        logger.error(msg, { tag, ...args });
-    },
-    error: (prefix, message, ...args) => {
-        const { tag, msg } = formatMessage(prefix, message);
-        logger.error(msg, { tag, ...args });
-    },
-    warn: (prefix, message, ...args) => {
-        const { tag, msg } = formatMessage(prefix, message);
-        logger.warn(msg, { tag, ...args });
-    },
-    info: (prefix, message, ...args) => {
-        const { tag, msg } = formatMessage(prefix, message);
-        logger.info(msg, { tag, ...args });
-    },
-    success: (prefix, message, ...args) => {
-        const { tag, msg } = formatMessage(prefix, message);
-        logger.success(msg, { tag, ...args });
-    },
-    master: (prefix, message, ...args) => {
-        const { tag, msg } = formatMessage(prefix, message);
-        logger.info(msg, { tag: tag || 'MASTER', ...args });
-    },
-    debug: (prefix, message, ...args) => {
-        const { tag, msg } = formatMessage(prefix, message);
-        logger.debug(msg, { tag, ...args });
-    },
+const bridge = {
+    err: (...args) => formatAndLog('error', args),
+    error: (...args) => formatAndLog('error', args),
+    warn: (...args) => formatAndLog('warn', args),
+    info: (...args) => formatAndLog('info', args),
+    success: (...args) => formatAndLog('success', args),
+    debug: (...args) => formatAndLog('debug', args),
+    master: (...args) => formatAndLog('info', ['MASTER', ...args]),
     dev: (...args) => {
-        if (["development", "production"].includes(process.env.NODE_ENV) == false)
-            return;
-        try {
-            throw new Error();
-        }
-        catch (err) {
-            const at = err.stack.split('\n')[2];
-            let position = at.slice(at.indexOf(process.cwd()) + process.cwd().length + 1);
-            position.endsWith(')') ? position = position.slice(0, -1) : null;
-            logger.debug(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), { tag: 'DEV', position });
+        if (process.env.NODE_ENV === 'development') {
+            formatAndLog('debug', ['DEV', ...args]);
         }
     }
 };
+
+module.exports = bridge;
