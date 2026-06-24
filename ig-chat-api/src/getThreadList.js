@@ -95,11 +95,14 @@ module.exports = function(ctx) {
             callback = (err, info) => { if (err) return rejectFunc(err); resolveFunc(info); };
         }
 
-        ctx.axios.get("https://www.instagram.com/api/v1/direct_v2/inbox/", {
+        const folder = (tags || []).includes("PENDING") ? "pending" : (tags || []).includes("OTHER") ? "other" : "inbox";
+
+        ctx.axios.get(`https://www.instagram.com/api/v1/direct_v2/inbox/`, {
             params : {
                 visual_message_return_type : "unseen",
                 persistentBadging          : "true",
-                limit                      : limit || 20
+                limit                      : limit || 20,
+                folder                     : folder
             },
             headers: getHeaders(ctx),
             timeout: 15000

@@ -73,6 +73,27 @@ function isBannedOrOnlyAdmin(userData, threadData, senderID, threadID, isGroup, 
 	const config = global.GoatBot.config;
 	const { adminBot, hideNotiMessage } = config;
 
+	// check whiteListMode and whiteListModeThread
+	const whitelistMode = config.whiteListMode?.enable === true;
+	const whitelistModeThread = config.whiteListModeThread?.enable === true;
+	const isWhitelistedSender = config.whiteListMode?.whiteListIds.includes(senderID);
+	const isWhitelistedThread = config.whiteListModeThread?.whiteListThreadIds.includes(threadID);
+
+	if (whitelistMode && whitelistModeThread) {
+		if (!isWhitelistedSender && !isWhitelistedThread && !adminBot.includes(senderID)) {
+			// If both enabled, must be in one of them or be admin
+			return true;
+		}
+	} else if (whitelistMode) {
+		if (!isWhitelistedSender && !adminBot.includes(senderID)) {
+			return true;
+		}
+	} else if (whitelistModeThread) {
+		if (!isWhitelistedThread && !adminBot.includes(senderID)) {
+			return true;
+		}
+	}
+
 	// check if user banned
 	const infoBannedUser = userData.banned;
 	if (infoBannedUser.status == true) {

@@ -65,10 +65,31 @@ Built by **Gtajisan**, based on [NTKhang's GoatBot V2](https://github.com/ntkhan
 
 ---
 
+## 🔒 Whitelist & Approval Logic
+
+The bot includes several modes to control who can interact with it:
+
+1. **Admin Only Mode**:
+   Set `"adminOnly": { "enable": true }` in `config.json`. Only IDs in `adminBot` can use the bot.
+
+2. **User Whitelist**:
+   Enable `whiteListMode` and add user IDs to `whiteListIds`. Only these users can use the bot in DMs or groups.
+
+3. **Thread Whitelist**:
+   Enable `whiteListModeThread` and add thread IDs (Group IDs or DM IDs) to `whiteListThreadIds`. The bot will only respond within these specific threads.
+
+4. **Combined Mode**:
+   If both whitelists are enabled, the bot responds if *either* the user is whitelisted *or* the thread is whitelisted.
+
+5. **Group Admin Approval (OnlyAdminBox)**:
+   In group settings, you can enable `onlyAdminBox`. When on, only group admins can trigger bot commands.
+
 ## ⚙️ Configuration (config.json)
 
 | Key | Description |
 |-----|-------------|
+| `whiteListMode` | Enable whitelisting specific users by ID. |
+| `whiteListModeThread` | Enable whitelisting specific threads (Groups/DMs) by ID. |
 | `humanDelay` | Configures random delays and typing indicators before replies. |
 | `logging` | Sets `logLevel` (info, debug, etc.) and enables/disables `logToFile`. |
 | `aiFallback` | Enables triggering an AI command (e.g., `gpt`) if no command is matched. |
@@ -89,9 +110,10 @@ Built by **Gtajisan**, based on [NTKhang's GoatBot V2](https://github.com/ntkhan
 ## 🤝 Best Practices & Anti-Ban
 
 1. **Use Natural Delays**: Keep `humanDelay` enabled in `config.json` to make the bot appear more human.
-2. **Warm Up**: Before running the bot, log into the account on the same IP via a browser.
-3. **Avoid Spam**: Don't use the bot to send mass messages or join too many groups quickly.
-4. **Dedicated Account**: Use a secondary account to avoid risking your personal profile.
+2. **Whitelist Mode**: Use `whiteListMode` or `whiteListModeThread` to restrict the bot to approved users or groups. This is highly recommended to prevent random users from triggering the bot and causing rate limits.
+3. **Warm Up**: Before running the bot, log into the account on the same IP via a browser.
+4. **Avoid Spam**: Don't use the bot to send mass messages or join too many groups quickly.
+5. **Dedicated Account**: Use a secondary account to avoid risking your personal profile.
 
 ---
 
