@@ -15,6 +15,29 @@ module.exports = (api, threadModel, userModel, dashBoardModel, globalModel, user
 
 		const message = createFuncMessage(api, event);
 
+		// Add human-like delay and typing indicator for realism
+		const { config } = global.GoatBot;
+		if (config.humanDelay?.enable !== false && (event.type === "message" || event.type === "message_reply")) {
+			const min = config.humanDelay?.min || 500;
+			const max = config.humanDelay?.max || 2000;
+
+			// Optional typing indicator
+			if (config.humanDelay?.typingIndicator !== false) {
+				api.sendTypingIndicator(event.threadID, (err) => {
+					if (err) global.utils.log.warn("TYPING", `Could not send typing indicator: ${err.message}`);
+				});
+			}
+
+			await global.utils.humanDelay(min, max);
+		}
+
+		// Send read receipt if enabled
+		if (config.optionsFca?.autoMarkRead && event.messageID) {
+			api.markAsRead(event.threadID, (err) => {
+				if (err) global.utils.log.warn("READ", `Could not mark as read: ${err.message}`);
+			});
+		}
+
 		await handlerCheckDB(usersData, threadsData, event);
 		const handlerChat = await handlerEvents(event, message);
 		if (!handlerChat)

@@ -250,7 +250,24 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
 			// —————  CHECK BANNED OR ONLY ADMIN BOX  ————— //
 			if (isBannedOrOnlyAdmin(userData, threadData, senderID, threadID, isGroup, commandName, message, langCode))
 				return;
-			if (!command)
+			if (!command) {
+				// AI Fallback integration point
+				if (config.aiFallback?.enable) {
+					const aiCommand = GoatBot.commands.get(config.aiFallback.command);
+					if (aiCommand) {
+						try {
+							return await aiCommand.onStart({
+								...parameters,
+								args: [commandName, ...args],
+								commandName: config.aiFallback.command,
+								getLang: createGetText2(langCode, `${process.cwd()}/languages/cmds/${langCode}.js`, prefix, aiCommand)
+							});
+						} catch (e) {
+							log.error("AI FALLBACK", `Error in AI fallback: ${e.message}`);
+						}
+					}
+				}
+
 				if (!hideNotiMessage.commandNotFound)
 					return await message.reply(
 						commandName ?
@@ -259,6 +276,7 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
 					);
 				else
 					return true;
+			}
 			// ————————————— CHECK PERMISSION ———————————— //
 			const roleConfig = getRoleConfig(utils, command, isGroup, threadData, commandName);
 			const needRole = roleConfig.onStart;

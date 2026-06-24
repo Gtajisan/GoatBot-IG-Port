@@ -278,14 +278,19 @@ async function attemptLogin(loginData, loginOptions, label) {
                     api, threadModel, userModel, dashBoardModel, globalModel,
                     threadsData, usersData, dashBoardData, globalData, error: err
                 });
-            } catch (e2) {}
+            } catch (e2) {
+                log.error("LISTEN", `Error in handlerWhenListenHasError: ${e2.message}`);
+            }
             return;
         }
 
         try {
-            await handler(event);
+            // Use withBackoff for robust event handling
+            await global.utils.withBackoff(async () => {
+                await handler(event);
+            });
         } catch (e) {
-            log.error("HANDLER", `Unhandled error: ${e.message}`);
+            log.error("HANDLER", `Unhandled error in event handler: ${e.message}`, { stack: e.stack });
         }
     });
 

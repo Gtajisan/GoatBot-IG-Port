@@ -18,6 +18,21 @@
   },
   "nickNameBot": "GoatBot-IG",
   "prefix": "/",
+  "humanDelay": {
+    "enable": true,
+    "min": 500,
+    "max": 2000,
+    "typingIndicator": true
+  },
+  "logging": {
+    "logLevel": "info",
+    "logToFile": true
+  },
+  "aiFallback": {
+    "enable": false,
+    "command": "gpt",
+    "notes": "Trigger a command (e.g., 'gpt' or 'ai') when no other command is found."
+  },
   "database": {
     "type": "json",
     "uriMongodb": "",
@@ -79,6 +94,7 @@
     "selfListen": false,
     "selfListenEvent": true,
     "autoMarkDelivery": false,
+    "autoMarkRead": true,
     "autoReconnect": true
   },
   "instagramPolling": {

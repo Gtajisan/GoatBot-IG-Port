@@ -893,7 +893,54 @@ const utils = {
 	shortenURL,
 	uploadZippyshare,
 	uploadImgbb,
-	GoatBotApis
+	GoatBotApis,
+
+	/**
+	 * New Helpers inspired by insta-p8
+	 */
+
+	/**
+	 * Introduces a random human-like delay
+	 * @param {number} min Minimum delay in ms
+	 * @param {number} max Maximum delay in ms
+	 * @returns {Promise<void>}
+	 */
+	humanDelay: async (min = 500, max = 2000) => {
+		const delay = Math.floor(Math.random() * (max - min + 1)) + min;
+		return new Promise(resolve => setTimeout(resolve, delay));
+	},
+
+	/**
+	 * Cleans message text by removing unnecessary whitespace and escaping characters if needed
+	 * @param {string} text The text to clean
+	 * @returns {string}
+	 */
+	cleanMessage: (text) => {
+		if (typeof text !== 'string') return '';
+		return text.trim().replace(/\s+/g, ' ');
+	},
+
+	/**
+	 * Basic rate-limit backoff logic
+	 * @param {Function} fn The function to execute
+	 * @param {number} retries Number of retries
+	 * @param {number} delay Initial delay in ms
+	 * @returns {Promise<any>}
+	 */
+	withBackoff: async (fn, retries = 3, delay = 1000) => {
+		try {
+			return await fn();
+		} catch (error) {
+			if (retries <= 0) throw error;
+			if (error.message && (error.message.includes('rate limit') || error.message.includes('spam'))) {
+				const backoffDelay = delay * 2;
+				utils.log.warn('BACKOFF', `Rate limit hit, retrying in ${backoffDelay}ms...`);
+				await new Promise(resolve => setTimeout(resolve, backoffDelay));
+				return utils.withBackoff(fn, retries - 1, backoffDelay);
+			}
+			throw error;
+		}
+	}
 };
 
 module.exports = utils;

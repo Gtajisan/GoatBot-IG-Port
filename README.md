@@ -9,6 +9,8 @@ Built by **Gtajisan**, based on [NTKhang's GoatBot V2](https://github.com/ntkhan
 
 - Responds to Instagram Direct Messages & Group Chats
 - **Email/Password login** — no more expired cookie headaches
+- **Robust Logging** — New `winston`-based logging system with level support and daily rotation
+- **Anti-Ban Measures** — Natural `humanDelay` before replies and automatic rate-limit backoff
 - Auto session restore — re-login only when truly needed
 - Plug-and-play commands & events (drop a `.js` file, it loads automatically)
 - JSON / SQLite / MongoDB database support
@@ -83,6 +85,24 @@ Edit **`config.json`**:
 ```
 
 To find your Instagram numeric user ID, search *"Instagram user ID finder"* online and enter your username.
+
+### New Features & Best Practices
+
+This port has been enhanced with patterns to ensure reliability and realism:
+
+#### 1. Enhanced Logging
+- **Location**: `./logs/`
+- **Features**: Console colors, daily rotation (`application-YYYY-MM-DD.log`, `error-YYYY-MM-DD.log`), and structured metadata.
+- **Usage**: `global.utils.log.info("TAG", "Message")`
+
+#### 2. Natural Delays & Realism
+- **Human Delay**: Configurable random delays before the bot replies.
+- **Typing Indicators**: Bot will show "typing..." before sending a message.
+- **Read Receipts**: Automatically marks messages as read if enabled.
+
+#### 3. Error Handling
+- **Backoff Logic**: Automatically waits and retries when hitting Instagram rate limits.
+- **Comprehensive try/catch**: Better error reporting and stability.
 
 ### Step 4 — Start
 
