@@ -10,7 +10,14 @@ Setting up a bot on Instagram requires caution to avoid account restrictions. Th
 
 ## 2. Login Methods
 
-### Username/Password (Recommended)
+### .env File (Recommended for Local/VPS)
+Create a `.env` file in the root directory (you can copy `.env.example`) and add:
+```
+IG_USERNAME=your_username
+IG_PASSWORD=your_password
+```
+
+### Username/Password (Legacy)
 Add your credentials to `account.txt` in this format:
 ```
 username=your_username

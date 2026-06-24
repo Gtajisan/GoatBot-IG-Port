@@ -13,6 +13,8 @@
 process.on('unhandledRejection', error => console.log(error));
 process.on('uncaughtException', error => console.log(error));
 
+require('dotenv').config();
+
 const axios = require("axios");
 const fs = require("fs-extra");
 const { execSync } = require('child_process');

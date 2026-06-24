@@ -37,11 +37,12 @@ Built by **Gtajisan**, based on [NTKhang's GoatBot V2](https://github.com/ntkhan
    ```
 
 2. **Set Credentials**:
-   Open `account.txt` and add your username and password:
+   Rename `.env.example` to `.env` and fill in your details:
    ```
-   username=your_instagram_username
-   password=your_instagram_password
+   IG_USERNAME=your_instagram_username
+   IG_PASSWORD=your_instagram_password
    ```
+   *Alternatively, you can use `account.txt` with `username=...` and `password=...`.*
 
 3. **Configure**:
    Edit `config.json` to set your admin ID and preferred prefix:
