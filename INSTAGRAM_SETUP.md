@@ -1,118 +1,59 @@
+# Instagram Setup & Best Practices
 
-# Instagram GoatBot Setup Guide
+Setting up a bot on Instagram requires caution to avoid account restrictions. This guide covers how to set up your account and maintain it safely.
 
-## Prerequisites
+## 1. Account Preparation
 
-1. **Instagram Business or Creator Account**
-   - Convert your personal Instagram to Business/Creator account
-   - Link it to a Facebook Page
+- **Account Age**: Use an account that is at least 1-2 weeks old. Brand-new accounts are flagged easily.
+- **Profile**: Ensure your account has a profile picture, bio, and at least 3-5 posts.
+- **Human Activity**: Manually use the account for a few days (liking, scrolling, messaging) before starting the bot.
 
-2. **Facebook Developer Account**
-   - Go to [developers.facebook.com](https://developers.facebook.com)
-   - Create an account if you don't have one
+## 2. Login Methods
 
-## Step-by-Step Setup
-
-### 1. Create Facebook App
-
-1. Go to [developers.facebook.com/apps](https://developers.facebook.com/apps)
-2. Click "Create App"
-3. Choose "Business" type
-4. Fill in app details:
-   - App Name: "GoatBot Instagram"
-   - Contact Email: your email
-5. Click "Create App"
-
-### 2. Add Instagram Product
-
-1. In your app dashboard, click "Add Product"
-2. Find "Instagram" and click "Set Up"
-3. Click "Instagram Messaging" → "Set Up"
-
-### 3. Get Access Token
-
-1. Go to Tools → Graph API Explorer
-2. Select your app from dropdown
-3. Add permissions:
-   - `instagram_basic`
-   - `instagram_manage_messages`
-   - `pages_messaging`
-   - `pages_read_engagement`
-4. Click "Generate Access Token"
-5. **Copy this token** - you'll need it!
-
-### 4. Get Instagram Page ID
-
-1. In Graph API Explorer, enter: `me?fields=instagram_business_account`
-2. Click "Submit"
-3. Copy the `instagram_business_account.id` value
-
-### 5. Configure Webhook
-
-1. Go to your app → Products → Webhooks
-2. Choose "Instagram" from dropdown
-3. Click "Subscribe to Instagram Updates"
-4. Enter callback URL: `https://your-replit-url.repl.co/webhook`
-5. Enter verify token: `goatbot_ig_verify` (or your custom token)
-6. Subscribe to fields:
-   - `messages`
-   - `messaging_postbacks`
-   - `message_reactions`
-
-### 6. Configure Environment Variables
-
-Create a `.env` file or use Replit Secrets:
-
-```env
-INSTAGRAM_ACCESS_TOKEN=your_access_token_here
-INSTAGRAM_PAGE_ID=your_instagram_page_id_here
-INSTAGRAM_VERIFY_TOKEN=goatbot_ig_verify
-PORT=5000
+### Username/Password (Recommended)
+Add your credentials to `account.txt` in this format:
+```
+username=your_username
+password=your_password
 ```
 
-### 7. Start the Bot
+### Environment Variables (Replit/Cloud)
+Set `IG_USERNAME` and `IG_PASSWORD` in your hosting environment's secrets.
 
-```bash
-npm install
-npm start
+## 3. Handling Checkpoints & 2FA
+
+- **Checkpoint**: If you see "Checkpoint Required", log in to the Instagram app on your phone and click "It was me".
+- **2FA**: We recommend using TOTP (authenticator app) if you enable 2FA. You can provide the code via the `IG_2FA_CODE` environment variable or enter it in the terminal during startup.
+
+## 4. Anti-Ban Features in this Port
+
+We have integrated several features inspired by `insta-p8` to protect your account:
+
+- **Human-like Delays**: The bot waits a random time (500ms - 2000ms) before responding.
+- **Typing Indicators**: The bot shows "typing..." status while waiting to reply.
+- **Automatic Backoff**: If the bot hits a rate limit, it will automatically pause and retry after a delay.
+- **Read Receipts**: The bot can automatically mark messages as read to simulate a real user.
+
+## 5. Configuration for Safety
+
+In `config.json`, you can tune these settings:
+
+```json
+"humanDelay": {
+  "enable": true,
+  "min": 500,
+  "max": 2000,
+  "typingIndicator": true
+},
+"optionsFca": {
+  "autoMarkRead": true
+}
 ```
 
-## Testing
+## 6. Daily Monitoring
 
-1. Send a DM to your Instagram account
-2. Check bot console for incoming message logs
-3. Bot should respond based on commands
+- **Check Logs**: Monitor the `./logs/` directory to see if there are any `error` or `rate limit` messages.
+- **Stay Updated**: Keep the bot and its dependencies updated.
 
-## Important Notes
-
-- ✅ **Works**: Direct messages (1-on-1)
-- ❌ **Doesn't work**: Instagram group chats (not supported by API)
-- ⚠️ **Rate Limits**: Instagram has stricter rate limits than Messenger
-- 🔄 **Token Expiry**: Access tokens may expire, use long-lived tokens
-
-## Troubleshooting
-
-### "Invalid access token"
-- Regenerate token with correct permissions
-- Ensure app is not in development mode restrictions
-
-### "Webhook not receiving messages"
-- Check webhook is subscribed to correct fields
-- Verify callback URL is accessible (use https)
-- Check verify token matches
-
-### "Cannot send messages"
-- User must message bot first (can't initiate conversations)
-- Check `instagram_manage_messages` permission is granted
-
-## Getting Long-Lived Token
-
-```bash
-curl -i -X GET "https://graph.facebook.com/v19.0/oauth/access_token?grant_type=fb_exchange_token&client_id=YOUR_APP_ID&client_secret=YOUR_APP_SECRET&fb_exchange_token=YOUR_SHORT_TOKEN"
-```
-
-## Support
-
-For issues, check:
-- [Instagram Graph API Docs](https://developers.facebook.com/docs/instagram-api/guides/messaging)
-- [GoatBot GitHub Issues](https://github.com/Team-Calyx/GoatBot-V2/issues)
+---
+**Warning**: Using unofficial APIs is against Instagram's Terms of Service. This bot is for educational and personal use.
