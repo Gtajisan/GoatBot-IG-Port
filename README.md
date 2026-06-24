@@ -85,6 +85,16 @@ The bot includes several modes to control who can interact with it:
 5. **Group Admin Approval (OnlyAdminBox)**:
    In group settings, you can enable `onlyAdminBox`. When on, only group admins can trigger bot commands.
 
+---
+
+## 🛡️ Safe Login & Session Continuity
+
+To prevent your account from being flagged as a "new login" every time the bot restarts, we use a sophisticated session persistence mechanism:
+
+- **Stable Fingerprints**: The bot generates unique, stable device identifiers (`deviceID`, `uuid`, `androidID`) based on your username.
+- **Session Reuse**: These identifiers, along with your cookies, are saved in `session.json`.
+- **continuity**: On subsequent starts, the bot restores the exact same "device" and session, mimicking a real app that stays logged in.
+
 ## ⚙️ Configuration (config.json)
 
 | Key | Description |

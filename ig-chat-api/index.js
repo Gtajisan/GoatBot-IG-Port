@@ -332,7 +332,7 @@ function login(loginData, options, callback) {
 
             if (hasCredentials) {
                 console.log("[ig-chat-api] Using email/password login...");
-                const result = await passwordLogin(loginData.username, loginData.password, null);
+                const result = await passwordLogin(loginData.username, loginData.password, loginData);
                 ctx = buildContextFromPasswordResult(result, globalOptions);
                 console.log(`[ig-chat-api] ✓ Logged in as @${ctx.username} (ID: ${ctx.userID})`);
 

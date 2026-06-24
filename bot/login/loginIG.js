@@ -94,8 +94,9 @@ function loadSavedSession() {
     if (!fs.existsSync(SESSION_PATH)) return null;
     try {
         const raw = JSON.parse(fs.readFileSync(SESSION_PATH, "utf8"));
-        if (Array.isArray(raw) && raw.length > 0) return raw;
-        if (raw.appState && Array.isArray(raw.appState) && raw.appState.length > 0) return raw.appState;
+        // Backward compatibility
+        if (Array.isArray(raw) && raw.length > 0) return { appState: raw };
+        if (raw.appState && Array.isArray(raw.appState) && raw.appState.length > 0) return raw;
         return null;
     } catch (e) {
         return null;
@@ -104,9 +105,9 @@ function loadSavedSession() {
 
 function saveSession(api) {
     try {
-        const appState = api.getAppState();
-        if (appState && appState.length > 0) {
-            fs.writeFileSync(SESSION_PATH, JSON.stringify(appState, null, 2));
+        const sessionData = api.getAppState();
+        if (sessionData) {
+            fs.writeFileSync(SESSION_PATH, JSON.stringify(sessionData, null, 2));
         }
     } catch (e) {}
 }
@@ -136,7 +137,8 @@ async function attemptLogin(loginData, loginOptions, label) {
         autoReconnect    : config.optionsFca?.autoReconnect   ?? true,
         logLevel         : config.optionsFca?.logLevel        ?? "info",
         userAgent        : config.instagramAccount?.userAgent
-            || "Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+            || "Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+        instagramPolling : config.instagramPolling
     };
 
     const accountText = readAccountFile();
@@ -170,7 +172,8 @@ async function attemptLogin(loginData, loginOptions, label) {
         if (savedSession) {
             log.info("LOGIN", "Trying saved session from session.json...");
             try {
-                api = await attemptLogin({ appState: savedSession }, loginOptions, "Saved session");
+                // Pass full session object to attemptLogin to preserve device IDs
+                api = await attemptLogin(savedSession, loginOptions, "Saved session");
                 log.success("LOGIN", "Restored session from session.json ✓");
             } catch (e) {
                 log.warn("LOGIN", "Saved session is expired — deleting session.json...");

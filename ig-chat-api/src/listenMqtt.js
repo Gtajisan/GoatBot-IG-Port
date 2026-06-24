@@ -132,14 +132,17 @@ module.exports = function(ctx, api) {
         let isFirstPoll     = true;
         let errorCount      = 0;
         const seen          = new Set();
-        const MIN_DELAY     = 4000;
-        const MAX_DELAY     = 90000;
+        const MIN_DELAY     = ctx.globalOptions.instagramPolling?.minDelay || 5000;
+        const MAX_DELAY     = ctx.globalOptions.instagramPolling?.maxDelay || 120000;
         const sleep         = ms => new Promise(r => setTimeout(r, ms));
 
         const getDelay = () => {
-            if (errorCount === 0) return MIN_DELAY;
+            if (errorCount === 0) {
+                // Add some jitter even to base delay
+                return MIN_DELAY + Math.floor(Math.random() * 2000);
+            }
             return Math.min(MIN_DELAY * Math.pow(2, errorCount - 1), MAX_DELAY)
-                   + Math.floor(Math.random() * 1500);
+                   + Math.floor(Math.random() * 3000);
         };
 
         const emit = (event) => {
