@@ -88,7 +88,8 @@ global.GoatBot = {
     callbackListenTime: {},
     storage5Message: [],
     igApi: null,
-    botID: null
+    botID: null,
+    logger: log
 };
 
 global.db = {
