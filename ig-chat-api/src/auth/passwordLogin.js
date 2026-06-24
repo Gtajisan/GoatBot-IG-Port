@@ -103,11 +103,14 @@ async function passwordLogin(username, password, savedSession, log) {
     };
 
     const seed = `${username}_goatbot_ig_2024`;
-    const deviceID = generateDeviceID(seed);
-    const phoneID = generatePhoneID(seed);
-    const uuid = generateUUID(seed + "_uuid");
+
+    // Reuse identifiers if available in savedSession to maintain consistency
+    const deviceID = savedSession?.deviceID || generateDeviceID(seed);
+    const phoneID  = savedSession?.phoneID || generatePhoneID(seed);
+    const uuid     = savedSession?.uuid || generateUUID(seed + "_uuid");
+    const androidID = savedSession?.androidID || ("android-" + crypto.createHash("md5").update(seed).digest("hex").slice(0, 15));
+
     const pigeonSessionID = generateUUID(seed + "_pigeon");
-    const androidID = "android-" + crypto.createHash("md5").update(seed).digest("hex").slice(0, 15);
 
     const jar = new CookieJar();
 
