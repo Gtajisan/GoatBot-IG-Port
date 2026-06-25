@@ -1,5 +1,3 @@
-'use strict';
-
 const fs = require('fs');
 const path = require('path');
 const logger = require('./logger');
@@ -9,97 +7,62 @@ class ConfigManager {
 
   static loadConfig() {
     try {
-      if (fs.existsSync(this.configPath)) {
-        return JSON.parse(fs.readFileSync(this.configPath, 'utf-8'));
-      }
+      if (fs.existsSync(this.configPath)) return JSON.parse(fs.readFileSync(this.configPath, 'utf-8'));
       return {};
-    } catch (error) {
-      logger.error('Error loading config:', { error: error.message });
-      return {};
-    }
+    } catch (e) { logger.error('Error loading config', { error: e.message }); return {}; }
   }
 
   static saveConfig(cfg) {
-    try {
-      fs.writeFileSync(this.configPath, JSON.stringify(cfg, null, 2), 'utf-8');
-      logger.info('Configuration saved');
-      return true;
-    } catch (error) {
-      logger.error('Error saving config:', { error: error.message });
-      return false;
-    }
+    try { fs.writeFileSync(this.configPath, JSON.stringify(cfg, null, 2), 'utf-8'); return true; }
+    catch (e) { logger.error('Error saving config', { error: e.message }); return false; }
   }
 
-  static getAdmins() {
-    try { return (this.loadConfig().adminBot || []).map(String); } catch (_) { return []; }
+  static getAdmins()       { return this.loadConfig().adminBot     || []; }
+  static getPremiumUsers() { return this.loadConfig().premiumUsers  || []; }
+  static getDevUsers()     { return this.loadConfig().devUsers      || []; }
+  static isAdmin(uid)      { return this.getAdmins().includes(String(uid)); }
+  static isDev(uid)        { return this.getDevUsers().includes(String(uid)); }
+  static getDeveloper()    { return this.getDevUsers()[0] || ''; }
+
+  static addAdmin(uid) {
+    const cfg = this.loadConfig();
+    if (!cfg.adminBot) cfg.adminBot = [];
+    if (cfg.adminBot.includes(String(uid))) return false;
+    cfg.adminBot.push(String(uid));
+    return this.saveConfig(cfg);
   }
 
-  static isAdmin(userId) { return this.getAdmins().includes(String(userId)); }
-
-  static addAdmin(userId) {
-    try {
-      const cfg = this.loadConfig();
-      if (!cfg.adminBot) cfg.adminBot = [];
-      const uid = String(userId);
-      if (cfg.adminBot.map(String).includes(uid)) return false;
-      cfg.adminBot.push(uid);
-      return this.saveConfig(cfg);
-    } catch (_) { return false; }
+  static removeAdmin(uid) {
+    const cfg = this.loadConfig();
+    if (!cfg.adminBot) return false;
+    const idx = cfg.adminBot.indexOf(String(uid));
+    if (idx === -1) return false;
+    if (cfg.devUsers && cfg.devUsers.includes(String(uid))) return false;
+    cfg.adminBot.splice(idx, 1);
+    return this.saveConfig(cfg);
   }
 
-  static removeAdmin(userId) {
-    try {
-      const cfg = this.loadConfig();
-      if (!cfg.adminBot) return false;
-      const uid = String(userId);
-      if (cfg.devUsers && cfg.devUsers.map(String).includes(uid)) return false;
-      const idx = cfg.adminBot.map(String).indexOf(uid);
-      if (idx === -1) return false;
-      cfg.adminBot.splice(idx, 1);
-      return this.saveConfig(cfg);
-    } catch (_) { return false; }
+  static addPremiumUser(uid) {
+    const cfg = this.loadConfig();
+    if (!cfg.premiumUsers) cfg.premiumUsers = [];
+    if (cfg.premiumUsers.includes(String(uid))) return false;
+    cfg.premiumUsers.push(String(uid));
+    return this.saveConfig(cfg);
   }
 
-  static getPremiumUsers() {
-    try { return (this.loadConfig().premiumUsers || []).map(String); } catch (_) { return []; }
+  static removePremiumUser(uid) {
+    const cfg = this.loadConfig();
+    if (!cfg.premiumUsers) return false;
+    const idx = cfg.premiumUsers.indexOf(String(uid));
+    if (idx === -1) return false;
+    cfg.premiumUsers.splice(idx, 1);
+    return this.saveConfig(cfg);
   }
 
-  static addPremiumUser(userId) {
-    try {
-      const cfg = this.loadConfig();
-      if (!cfg.premiumUsers) cfg.premiumUsers = [];
-      const uid = String(userId);
-      if (cfg.premiumUsers.map(String).includes(uid)) return false;
-      cfg.premiumUsers.push(uid);
-      return this.saveConfig(cfg);
-    } catch (_) { return false; }
-  }
-
-  static removePremiumUser(userId) {
-    try {
-      const cfg = this.loadConfig();
-      if (!cfg.premiumUsers) return false;
-      const uid = String(userId);
-      const idx = cfg.premiumUsers.map(String).indexOf(uid);
-      if (idx === -1) return false;
-      cfg.premiumUsers.splice(idx, 1);
-      return this.saveConfig(cfg);
-    } catch (_) { return false; }
-  }
-
-  static getDevUsers() {
-    try { return (this.loadConfig().devUsers || []).map(String); } catch (_) { return []; }
-  }
-
-  static isDev(userId) { return this.getDevUsers().includes(String(userId)); }
-
-  static getDeveloper() {
-    const devs = this.getDevUsers();
-    return devs[0] || '';
-  }
-
-  static getPrefix() {
-    try { return this.loadConfig().prefix || '/'; } catch (_) { return '/'; }
+  static updateConfig(key, value) {
+    const cfg = this.loadConfig();
+    cfg[key] = value;
+    return this.saveConfig(cfg);
   }
 }
 

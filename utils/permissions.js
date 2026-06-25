@@ -1,5 +1,3 @@
-'use strict';
-
 const ConfigManager = require('./configManager');
 const logger = require('./logger');
 
@@ -8,9 +6,7 @@ class PermissionManager {
     if (!threadInfo) return false;
     const uid = String(userId);
     if (Array.isArray(threadInfo.adminIDs)) {
-      return threadInfo.adminIDs.some(a =>
-        (typeof a === 'object' ? String(a.uid || a.id || '') : String(a)) === uid
-      );
+      return threadInfo.adminIDs.some(a => (typeof a === 'object' ? String(a.uid || a.id || '') : String(a)) === uid);
     }
     if (Array.isArray(threadInfo.adminParticipants)) {
       return threadInfo.adminParticipants.some(a => String(a.userID || a.uid || a) === uid);
@@ -27,33 +23,32 @@ class PermissionManager {
   }
 
   static getUserRole(userId, threadInfo = null) {
-    const globalRole = this.getGlobalRole(userId);
-    if (globalRole !== 0) return globalRole;
+    const g = this.getGlobalRole(userId);
+    if (g !== 0) return g;
     if (this.isGroupAdmin(userId, threadInfo)) return 1;
     return 0;
   }
 
   static async hasPermission(userId, requiredRole = 0, threadInfo = null) {
     if (requiredRole === 0) return true;
-    const globalRole = this.getGlobalRole(userId);
-    if (globalRole === 4) return true;
+    const g = this.getGlobalRole(userId);
+    if (g === 4) return true;
     switch (requiredRole) {
-      case 1: return globalRole === 2 || globalRole === 3 || this.isGroupAdmin(userId, threadInfo);
-      case 2: return globalRole === 2;
-      case 3: return globalRole === 3 || globalRole === 2;
+      case 1: return g === 2 || g === 3 || this.isGroupAdmin(userId, threadInfo);
+      case 2: return g === 2;
+      case 3: return g === 3 || g === 2;
       case 4: return false;
       default: return false;
     }
   }
 
-  static canUseNoPrefix(userId) {
-    const role = this.getGlobalRole(userId);
-    return role >= 2;
+  static getRoleName(role) {
+    return { 0: 'Normal User', 1: 'Group Administrator', 2: 'Bot Admin', 3: 'Premium User', 4: 'Bot Developer' }[role] ?? 'Unknown';
   }
 
-  static getRoleName(role) {
-    const names = { 0: 'Normal User', 1: 'Group Admin', 2: 'Bot Admin', 3: 'Premium User', 4: 'Developer' };
-    return names[role] || 'Normal User';
+  static canUseNoPrefix(userId) {
+    const g = this.getGlobalRole(userId);
+    return g === 2 || g === 4;
   }
 }
 

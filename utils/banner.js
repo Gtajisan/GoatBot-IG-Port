@@ -4,46 +4,38 @@ const config = require('../config');
 class Banner {
   static display() {
     console.log('\x1b[36m%s\x1b[0m', `
-  ██████╗  ██████╗  █████╗ ████████╗██████╗  ██████╗ ████████╗    ██╗ ██████╗
- ██╔════╝ ██╔═══██╗██╔══██╗╚══██╔══╝██╔══██╗██╔═══██╗╚══██╔══╝    ██║██╔════╝
- ██║  ███╗██║   ██║███████║   ██║   ██████╔╝██║   ██║   ██║       ██║██║  ███╗
- ██║   ██║██║   ██║██╔══██║   ██║   ██╔══██╗██║   ██║   ██║  ██   ██║██║   ██║
- ╚██████╔╝╚██████╔╝██║  ██║   ██║   ██████╔╝╚██████╔╝   ██║  ╚█████╔╝╚██████╔╝
-  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚═════╝  ╚═════╝    ╚═╝   ╚════╝  ╚═════╝
-                     Instagram Port — by Gtajisan  v${config.BOT_VERSION}
+  ██╗███╗   ██╗███████╗████████╗ █████╗ ██████╗  ██████╗ ████████╗
+  ██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██╔══██╗██╔═══██╗╚══██╔══╝
+  ██║██╔██╗ ██║███████╗   ██║   ███████║██████╔╝██║   ██║   ██║
+  ██║██║╚██╗██║╚════██║   ██║   ██╔══██║██╔══██╗██║   ██║   ██║
+  ██║██║ ╚████║███████║   ██║   ██║  ██║██████╔╝╚██████╔╝   ██║
+  ╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═════╝  ╚═════╝    ╚═╝
+                              GoatBot-IG v${config.BOT_VERSION} by Gtajisan
 `);
   }
 
   static startupMessage(userID, username, commandCount, eventCount) {
-    logger.success(`${config.BOT_NAME} started successfully`);
+    logger.success(`${config.NICK_NAME_BOT} started successfully`);
     logger.info(`User: @${username || 'Loading...'} (${userID || 'Loading...'})`);
     logger.info(`Loaded ${commandCount} commands and ${eventCount} events`);
     logger.info(`Prefix: ${config.PREFIX}`);
-    logger.success(`Listening for messages...`);
+    logger.success('Listening for messages...');
   }
 
-  static commandExecuted(commandName, user, success = true) {
-    logger.command(commandName, user, success);
-  }
+  static commandExecuted(name, user, ok = true) { logger.command(name, user, ok); }
 
   static messageReceived(from, preview) {
-    if (config.LOG_LEVEL === 'debug') {
-      let previewStr = '';
-      try {
-        if (typeof preview === 'string') previewStr = preview;
-        else if (preview === null || preview === undefined) previewStr = '';
-        else if (typeof preview === 'object') previewStr = JSON.stringify(preview);
-        else previewStr = String(preview);
-      } catch (_) { previewStr = '[unable to display]'; }
-      const truncated = previewStr.length > 40 ? previewStr.substring(0, 40) + '...' : previewStr;
-      logger.debug(`Message from ${from}: ${truncated}`);
+    if ((config.LOG_LEVEL || 'info') === 'debug') {
+      let p = '';
+      try { p = typeof preview === 'string' ? preview : JSON.stringify(preview); } catch (_) { p = '[n/a]'; }
+      logger.debug(`Message from ${from}: ${p.length > 40 ? p.substring(0, 40) + '...' : p}`);
     }
   }
 
-  static error(context, error) { logger.error(`${context}: ${error}`); }
-  static info(message) { logger.info(message); }
-  static warning(message) { logger.warn(message); }
-  static success(message) { logger.success(message); }
+  static error(ctx, err) { logger.error(`${ctx}: ${err}`); }
+  static info(msg)    { logger.info(msg); }
+  static warning(msg) { logger.warn(msg); }
+  static success(msg) { logger.success(msg); }
 }
 
 module.exports = Banner;

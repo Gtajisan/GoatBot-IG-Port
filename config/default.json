@@ -6,21 +6,26 @@
     "i_user": "",
     "proxy": null,
     "userAgent": "Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
-    "intervalGetNewCookie": 1440,
-    "notes": "Put your Instagram cookies in account.txt (Netscape cookie format). OR set IG_USERNAME and IG_PASSWORD environment variables for email/password login."
+    "intervalGetNewCookie": 1440
   },
   "antiInbox": false,
   "language": "en",
   "nickNameBot": "GoatBot-IG",
-  "prefix": "/",
-  "noPrefix": false,
+  "prefix": "!",
+  "noPrefix": true,
   "adminOnly": {
     "enable": false,
     "ignoreCommand": []
   },
-  "adminBot": ["17841449224751608"],
-  "premiumUsers": ["17841449224751608"],
-  "devUsers": ["17841449224751608"],
+  "adminBot": [
+    "29952506516"
+  ],
+  "premiumUsers": [
+    "29952506516"
+  ],
+  "devUsers": [
+    "29952506516"
+  ],
   "whiteListMode": {
     "enable": false,
     "whiteListIds": []
@@ -30,16 +35,28 @@
     "whiteListThreadIds": []
   },
   "database": {
-    "type": "json",
+    "type": "sqlite",
     "uriMongodb": "",
     "autoSave": true,
-    "saveIntervalMinutes": 1
+    "saveIntervalMinutes": 1,
+    "autoSyncWhenStart": false,
+    "autoRefreshThreadInfoFirstTime": true
   },
   "messageDelayMs": 100,
   "timeZone": "Asia/Dhaka",
   "dashBoard": {
-    "enable": true,
+    "enable": false,
+    "expireVerifyCode": 300000,
     "port": 3000
+  },
+  "serverUptime": {
+    "enable": false,
+    "port": 3000,
+    "socket": {
+      "enable": false,
+      "channelName": "uptime",
+      "verifyToken": ""
+    }
   },
   "spamProtection": {
     "commandThreshold": 8,
@@ -50,7 +67,7 @@
     "time": null
   },
   "autoUptime": {
-    "enable": false,
+    "enable": true,
     "timeInterval": 180,
     "url": ""
   },
@@ -69,21 +86,35 @@
     "logNoti": true
   },
   "notiWhenListenMqttError": {
-    "telegram": { "enable": false, "botToken": "", "chatId": "" },
-    "discordHook": { "enable": false, "webhookUrl": "" }
+    "telegram": {
+      "enable": false,
+      "botToken": "",
+      "chatId": ""
+    },
+    "discordHook": {
+      "enable": false,
+      "webhookUrl": ""
+    }
   },
   "hideNotiMessage": {
     "commandNotFound": false,
     "adminOnly": false,
     "threadBanned": false,
     "userBanned": false,
-    "needRoleToUseCmd": false
+    "needRoleToUseCmd": false,
+    "needRoleToUseCmdOnReply": false,
+    "needRoleToUseCmdOnReaction": false
   },
   "logEvents": {
     "disableAll": false,
     "message": true,
     "message_reaction": true,
-    "event": true
+    "message_unsend": true,
+    "message_reply": true,
+    "event": true,
+    "read_receipt": false,
+    "typ": false,
+    "presence": false
   },
   "typingIndicator": {
     "enable": true,
@@ -91,7 +122,7 @@
   },
   "optionsFca": {
     "online": true,
-    "selfListen": false,
+    "selfListen": true,
     "selfListenEvent": true,
     "listenEvents": true,
     "listenTyping": false,
@@ -99,6 +130,14 @@
     "autoMarkDelivery": false,
     "autoMarkRead": true,
     "autoReconnect": true,
-    "forceLogin": true
+    "forceLogin": true,
+    "simulateTyping": true,
+    "randomUserAgent": false,
+    "persona": "desktop",
+    "stealthMode": true,
+    "maxConcurrentRequests": 5,
+    "maxRequestsPerMinute": 50,
+    "requestCooldownMs": 60000,
+    "errorCacheTtlMs": 300000
   }
 }

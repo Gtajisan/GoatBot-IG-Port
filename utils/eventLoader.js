@@ -1,5 +1,3 @@
-'use strict';
-
 const fs = require('fs');
 const path = require('path');
 const logger = require('./logger');
@@ -18,47 +16,32 @@ class EventLoader {
       fs.mkdirSync(eventsPath, { recursive: true });
       return;
     }
-
-    const eventFiles = fs.readdirSync(eventsPath)
-      .filter(file => file.endsWith('.js') && !file.startsWith('_') && !file.includes('.eg.'));
-
-    logger.info(`Loading ${eventFiles.length} events...`);
-
-    for (const file of eventFiles) {
+    const files = fs.readdirSync(eventsPath).filter(f => f.endsWith('.js'));
+    logger.info(`Loading ${files.length} events...`);
+    for (const file of files) {
       try {
-        const filePath = path.join(eventsPath, file);
-        delete require.cache[require.resolve(filePath)];
-        const eventModule = require(filePath);
-        if (!eventModule.config || !eventModule.config.name) {
-          logger.warn(`Event ${file} missing config.name, skipping`);
-          continue;
-        }
-        this.events.set(eventModule.config.name, eventModule);
-        logger.info(`Loaded event: ${eventModule.config.name}`);
-      } catch (error) {
-        logger.error(`Failed to load event ${file}`, { error: error.message });
-      }
+        const fp = path.join(eventsPath, file);
+        delete require.cache[require.resolve(fp)];
+        const ev = require(fp);
+        if (!ev.config || !ev.config.name) { logger.warn(`Event ${file} missing config.name, skipping`); continue; }
+        this.events.set(ev.config.name, ev);
+        logger.info(`Loaded event: ${ev.config.name}`);
+      } catch (e) { logger.error(`Failed to load event ${file}`, { error: e.message }); }
     }
-
     logger.info(`Successfully loaded ${this.events.size} events`);
   }
 
   registerEvents() {
-    this.events.forEach((event, eventName) => {
-      if (typeof event.run === 'function') {
-        logger.debug(`Registered event handler: ${eventName}`);
-      }
+    this.events.forEach((ev, name) => {
+      if (typeof ev.run === 'function') logger.debug(`Registered event handler: ${name}`);
     });
   }
 
-  async handleEvent(eventName, data) {
-    const event = this.events.get(eventName);
-    if (!event) { logger.debug(`No handler for event: ${eventName}`); return; }
-    try {
-      await event.run(this.bot, data);
-    } catch (error) {
-      logger.error(`Error in event ${eventName}`, { error: error.message, stack: error.stack });
-    }
+  async handleEvent(name, data) {
+    const ev = this.events.get(name);
+    if (!ev) { logger.debug(`No handler for event: ${name}`); return; }
+    try { await ev.run(this.bot, data); }
+    catch (e) { logger.error(`Error handling event ${name}`, { error: e.message, stack: e.stack }); }
   }
 
   getAllEventNames() { return Array.from(this.events.keys()); }
