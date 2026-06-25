@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>GoatBot-IG Dashboard</title>
+<style>
+  :root{--bg:#0d1117;--card:#161b22;--border:#30363d;--accent:#238636;--accent2:#1f6feb;--text:#e6edf3;--sub:#8b949e;--red:#da3633;--yellow:#d29922;--green:#3fb950;--purple:#8957e5;--font:'Segoe UI',system-ui,sans-serif}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh}
+  header{background:var(--card);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:100}
+  .logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.1rem}
+  .logo-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--accent2),var(--purple));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px}
+  .status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  .header-right{display:flex;align-items:center;gap:16px;font-size:.85rem;color:var(--sub)}
+  nav{display:flex;gap:4px}
+  .nav-btn{background:none;border:none;color:var(--sub);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:.85rem;transition:.15s}
+  .nav-btn:hover,.nav-btn.active{background:rgba(255,255,255,.07);color:var(--text)}
+  .container{max-width:1280px;margin:0 auto;padding:24px}
+  .page{display:none}.page.active{display:block}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px}
+  @media(max-width:900px){.grid4{grid-template-columns:1fr 1fr}.grid3{grid-template-columns:1fr 1fr}}
+  @media(max-width:600px){.grid4,.grid2,.grid3{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px}
+  .card-title{font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--sub);margin-bottom:8px}
+  .stat-val{font-size:2rem;font-weight:700;line-height:1}
+  .stat-sub{font-size:.8rem;color:var(--sub);margin-top:4px}
+  .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:.72rem;font-weight:600}
+  .badge-green{background:rgba(63,185,80,.15);color:var(--green)}
+  .badge-red{background:rgba(218,54,51,.15);color:var(--red)}
+  .badge-yellow{background:rgba(210,153,34,.15);color:var(--yellow)}
+  .badge-blue{background:rgba(31,111,235,.15);color:var(--accent2)}
+  .badge-purple{background:rgba(137,87,229,.15);color:var(--purple)}
+  .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .section-title{font-size:1rem;font-weight:600}
+  .search-box{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 12px;color:var(--text);font-size:.85rem;width:220px;outline:none}
+  .search-box:focus{border-color:var(--accent2)}
+  table{width:100%;border-collapse:collapse;font-size:.85rem}
+  th{text-align:left;padding:10px 12px;font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--sub);border-bottom:1px solid var(--border)}
+  td{padding:10px 12px;border-bottom:1px solid rgba(48,54,61,.5);vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:rgba(255,255,255,.02)}
+  .avatar{width:32px;height:32px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:.8rem;flex-shrink:0}
+  .user-cell{display:flex;align-items:center;gap:10px}
+  .log-box{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px;height:500px;overflow-y:auto;font-family:'Courier New',monospace;font-size:.78rem;line-height:1.6}
+  .log-line{padding:2px 0;border-bottom:1px solid rgba(48,54,61,.3)}
+  .log-INFO{color:var(--green)}.log-ERROR{color:var(--red)}.log-WARN{color:var(--yellow)}.log-DEBUG{color:var(--sub)}
+  .refresh-btn{background:var(--card);border:1px solid var(--border);color:var(--text);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:.82rem;display:flex;align-items:center;gap:6px;transition:.15s}
+  .refresh-btn:hover{border-color:var(--accent2);color:var(--accent2)}
+  .progress-bar{background:rgba(255,255,255,.08);border-radius:4px;height:6px;overflow:hidden;margin-top:8px}
+  .progress-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--accent2),var(--purple));transition:.5s}
+  .cmd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+  .cmd-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px}
+  .cmd-name{font-weight:700;font-size:.9rem;margin-bottom:4px}
+  .cmd-desc{font-size:.75rem;color:var(--sub);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .empty{text-align:center;padding:40px;color:var(--sub)}
+  .loading{text-align:center;padding:40px;color:var(--sub);animation:pulse 1.5s infinite}
+  #thread-detail{display:none}
+  .back-btn{background:none;border:1px solid var(--border);color:var(--sub);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:.82rem;margin-bottom:16px;display:flex;align-items:center;gap:6px;width:fit-content}
+  .back-btn:hover{border-color:var(--accent2);color:var(--accent2)}
+  .member-avatar{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1rem;flex-shrink:0}
+  .uptime-box{font-size:1.5rem;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:700px){.two-col{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <div class="logo-icon">🐐</div>
+    GoatBot-IG
+    <span class="status-dot" id="status-dot"></span>
+    <span id="status-text" style="font-size:.8rem;font-weight:400;color:var(--sub)">Connecting...</span>
+  </div>
+  <nav>
+    <button class="nav-btn active" onclick="showPage('overview')">Overview</button>
+    <button class="nav-btn" onclick="showPage('threads')">Groups</button>
+    <button class="nav-btn" onclick="showPage('users')">Users</button>
+    <button class="nav-btn" onclick="showPage('commands')">Commands</button>
+    <button class="nav-btn" onclick="showPage('logs')">Logs</button>
+  </nav>
+  <div class="header-right">
+    <span id="bot-username">@—</span>
+    <span id="last-updated">—</span>
+  </div>
+</header>
+
+<div class="container">
+
+<!-- OVERVIEW PAGE -->
+<div class="page active" id="page-overview">
+  <div class="grid4">
+    <div class="card">
+      <div class="card-title">Status</div>
+      <div class="stat-val" id="ov-status">—</div>
+      <div class="stat-sub" id="ov-uptime">Uptime: —</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Commands Used</div>
+      <div class="stat-val" id="ov-cmds">—</div>
+      <div class="stat-sub">All time total</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Users Seen</div>
+      <div class="stat-val" id="ov-users">—</div>
+      <div class="stat-sub">In database</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Memory</div>
+      <div class="stat-val" id="ov-mem">—</div>
+      <div class="stat-sub" id="ov-mem-sub">Heap used</div>
+      <div class="progress-bar"><div class="progress-fill" id="ov-mem-bar" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <div class="grid4" style="margin-bottom:24px">
+    <div class="card">
+      <div class="card-title">Commands Loaded</div>
+      <div class="stat-val" id="ov-cmd-count">—</div>
+      <div class="stat-sub">Available commands</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Events Loaded</div>
+      <div class="stat-val" id="ov-evt-count">—</div>
+      <div class="stat-sub">Active event handlers</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Prefix</div>
+      <div class="stat-val" id="ov-prefix" style="font-size:2.5rem">—</div>
+      <div class="stat-sub">Command prefix</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Node.js</div>
+      <div class="stat-val" id="ov-node" style="font-size:1.4rem;margin-top:4px">—</div>
+      <div class="stat-sub" id="ov-platform">—</div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title" style="margin-bottom:16px">Bot Information</div>
+      <table>
+        <tbody id="bot-info-table"></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-title" style="margin-bottom:16px">Recent Activity</div>
+      <div id="recent-activity"><div class="loading">Loading...</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- THREADS / GROUPS PAGE -->
+<div class="page" id="page-threads">
+  <div id="thread-list">
+    <div class="section-header">
+      <div class="section-title">Group Chats & Threads</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input class="search-box" id="thread-search" placeholder="Search threads..." oninput="filterThreads()"/>
+        <button class="refresh-btn" onclick="loadThreads()">↻ Refresh</button>
+      </div>
+    </div>
+    <div class="card">
+      <div id="threads-body"><div class="loading">Loading threads...</div></div>
+    </div>
+  </div>
+
+  <div id="thread-detail">
+    <button class="back-btn" onclick="backToThreadList()">← Back to Threads</button>
+    <div class="grid3" id="thread-stat-cards"></div>
+    <div class="card">
+      <div class="section-header" style="margin-bottom:16px">
+        <div class="section-title" id="thread-detail-title">Members</div>
+        <input class="search-box" id="member-search" placeholder="Search members..." oninput="filterMembers()"/>
+      </div>
+      <div id="members-body"><div class="loading">Loading...</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- USERS PAGE -->
+<div class="page" id="page-users">
+  <div class="section-header">
+    <div class="section-title">All Users</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input class="search-box" id="user-search" placeholder="Search users..." oninput="filterUsers()"/>
+      <button class="refresh-btn" onclick="loadUsers()">↻ Refresh</button>
+    </div>
+  </div>
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Messages</th>
+          <th>Commands</th>
+          <th>Balance</th>
+          <th>First Seen</th>
+          <th>Last Seen</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="users-body"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- COMMANDS PAGE -->
+<div class="page" id="page-commands">
+  <div class="section-header">
+    <div class="section-title">Loaded Commands</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input class="search-box" id="cmd-search" placeholder="Search commands..." oninput="filterCommands()"/>
+    </div>
+  </div>
+  <div id="cmd-categories"></div>
+</div>
+
+<!-- LOGS PAGE -->
+<div class="page" id="page-logs">
+  <div class="section-header">
+    <div class="section-title">Live Logs</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <select id="log-level" onchange="filterLogs()" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:.82rem;cursor:pointer">
+        <option value="">All Levels</option>
+        <option value="INFO">INFO</option>
+        <option value="WARN">WARN</option>
+        <option value="ERROR">ERROR</option>
+        <option value="DEBUG">DEBUG</option>
+      </select>
+      <button class="refresh-btn" onclick="loadLogs()">↻ Refresh</button>
+      <button class="refresh-btn" onclick="toggleAutoRefresh()" id="auto-refresh-btn">⏸ Auto OFF</button>
+    </div>
+  </div>
+  <div class="card" style="padding:0">
+    <div class="log-box" id="log-box"></div>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<script>
+let allThreads=[], allUsers=[], allCommands=[], allLogs=[], currentThreadMembers=[];
+let autoRefreshLogs=false, autoRefreshTimer=null;
+
+function showPage(name){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  event.target.classList.add('active');
+  if(name==='overview') loadOverview();
+  else if(name==='threads') loadThreads();
+  else if(name==='users') loadUsers();
+  else if(name==='commands') loadCommands();
+  else if(name==='logs') loadLogs();
+}
+
+async function api(path){
+  try{
+    const r=await fetch('/api'+path);
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return await r.json();
+  }catch(e){console.error('API error',path,e);return null;}
+}
+
+function timeAgo(ts){
+  if(!ts) return '—';
+  const diff=(Date.now()-ts)/1000;
+  if(diff<60) return Math.floor(diff)+'s ago';
+  if(diff<3600) return Math.floor(diff/60)+'m ago';
+  if(diff<86400) return Math.floor(diff/3600)+'h ago';
+  return Math.floor(diff/86400)+'d ago';
+}
+
+function formatDate(ts){
+  if(!ts) return '—';
+  return new Date(ts).toLocaleString();
+}
+
+function fmtUptime(s){
+  const d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60),sec=Math.floor(s%60);
+  if(d) return `${d}d ${h}h ${m}m`;
+  if(h) return `${h}h ${m}m ${sec}s`;
+  return `${m}m ${sec}s`;
+}
+
+function avatarColor(id){
+  const colors=['#1f6feb','#238636','#8957e5','#da3633','#d29922','#3fb950','#f78166','#79c0ff'];
+  let h=0; for(let c of String(id)) h=(h*31+c.charCodeAt(0))&0xfffffff;
+  return colors[h%colors.length];
+}
+
+function avatarInitial(id){return String(id).charAt(0).toUpperCase();}
+
+/* ---- OVERVIEW ---- */
+async function loadOverview(){
+  const d=await api('/status');
+  if(!d) return;
+  document.getElementById('status-dot').style.background=d.connected?'var(--green)':'var(--red)';
+  document.getElementById('status-text').textContent=d.connected?'Online':'Offline';
+  document.getElementById('bot-username').textContent='@'+(d.username||d.userID||'—');
+  document.getElementById('last-updated').textContent='Updated '+new Date().toLocaleTimeString();
+  document.getElementById('ov-status').innerHTML=`<span class="badge badge-${d.connected?'green':'red'}">${d.connected?'● Online':'✕ Offline'}</span>`;
+  document.getElementById('ov-uptime').textContent='Uptime: '+fmtUptime(d.uptime);
+  document.getElementById('ov-cmds').textContent=(d.stats?.totalCommands||0).toLocaleString();
+  document.getElementById('ov-users').textContent=(d.totalUsers||0).toLocaleString();
+  const memMB=Math.round((d.memory?.heapUsed||0)/1024/1024);
+  const memTot=Math.round((d.memory?.heapTotal||0)/1024/1024);
+  document.getElementById('ov-mem').textContent=memMB+'MB';
+  document.getElementById('ov-mem-sub').textContent=`of ${memTot}MB heap`;
+  document.getElementById('ov-mem-bar').style.width=Math.min(100,Math.round(memMB/memTot*100))+'%';
+  document.getElementById('ov-cmd-count').textContent=d.commandCount||'—';
+  document.getElementById('ov-evt-count').textContent=d.eventCount||'—';
+  document.getElementById('ov-prefix').textContent=d.prefix||'!';
+  document.getElementById('ov-node').textContent=d.nodeVersion||'—';
+  document.getElementById('ov-platform').textContent=(d.platform||'—')+' '+( d.arch||'');
+
+  const rows=[
+    ['Bot Name',d.botName||'GoatBot-IG'],
+    ['Version',d.version||'1.0.0'],
+    ['User ID',d.userID||'—'],
+    ['Username','@'+(d.username||'—')],
+    ['Author','Gtajisan'],
+    ['Platform','Instagram DM (MQTT)'],
+  ];
+  document.getElementById('bot-info-table').innerHTML=rows.map(([k,v])=>
+    `<tr><td style="color:var(--sub);width:130px">${k}</td><td style="font-weight:500">${v}</td></tr>`
+  ).join('');
+
+  const acts=d.recentActivity||[];
+  document.getElementById('recent-activity').innerHTML=acts.length?
+    acts.map(a=>`<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:.83rem"><span style="color:var(--sub)">${timeAgo(a.time)}</span> — ${a.text}</div>`).join(''):
+    '<div class="empty">No recent activity</div>';
+}
+
+/* ---- THREADS ---- */
+async function loadThreads(){
+  document.getElementById('threads-body').innerHTML='<div class="loading">Fetching threads from Instagram...</div>';
+  const d=await api('/threads');
+  if(!d){document.getElementById('threads-body').innerHTML='<div class="empty">Failed to load threads</div>';return;}
+  allThreads=d.threads||[];
+  renderThreads(allThreads);
+}
+
+function renderThreads(threads){
+  if(!threads.length){document.getElementById('threads-body').innerHTML='<div class="empty">No threads found</div>';return;}
+  document.getElementById('threads-body').innerHTML=`
+    <table>
+      <thead><tr><th>Thread</th><th>Type</th><th>Members</th><th>Thread ID</th><th>Action</th></tr></thead>
+      <tbody>${threads.map((t,i)=>`
+        <tr>
+          <td><div class="user-cell">
+            <div class="avatar" style="background:${avatarColor(t.threadID)}">${t.name?t.name.charAt(0).toUpperCase():'G'}</div>
+            <div><div style="font-weight:500">${t.name||'Unnamed Thread'}</div><div style="font-size:.75rem;color:var(--sub)">${t.snippet||''}</div></div>
+          </div></td>
+          <td><span class="badge badge-${t.isGroup?'blue':'purple'}">${t.isGroup?'Group':'DM'}</span></td>
+          <td>${t.participantCount||'—'}</td>
+          <td style="font-family:monospace;font-size:.78rem;color:var(--sub)">${t.threadID}</td>
+          <td><button class="refresh-btn" onclick="showThreadDetail('${t.threadID}','${(t.name||'Thread').replace(/'/g,"\\'")}',${t.isGroup})">View</button></td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function filterThreads(){
+  const q=document.getElementById('thread-search').value.toLowerCase();
+  renderThreads(allThreads.filter(t=>(t.name||'').toLowerCase().includes(q)||t.threadID.includes(q)));
+}
+
+async function showThreadDetail(threadID,name,isGroup){
+  document.getElementById('thread-list').style.display='none';
+  document.getElementById('thread-detail').style.display='block';
+  document.getElementById('thread-detail-title').textContent=`Members — ${name}`;
+  document.getElementById('members-body').innerHTML='<div class="loading">Loading members...</div>';
+  document.getElementById('thread-stat-cards').innerHTML='';
+
+  const d=await api('/thread/'+threadID);
+  if(!d){document.getElementById('members-body').innerHTML='<div class="empty">Failed to load thread data</div>';return;}
+
+  const members=d.participants||d.members||[];
+  currentThreadMembers=members;
+
+  document.getElementById('thread-stat-cards').innerHTML=`
+    <div class="card"><div class="card-title">Thread ID</div><div style="font-family:monospace;font-size:.85rem;word-break:break-all">${threadID}</div></div>
+    <div class="card"><div class="card-title">Members</div><div class="stat-val">${members.length}</div></div>
+    <div class="card"><div class="card-title">Type</div><div class="stat-val" style="font-size:1.2rem">${isGroup?'Group Chat':'Direct Message'}</div></div>
+  `;
+
+  renderMembers(members);
+}
+
+function renderMembers(members){
+  if(!members.length){document.getElementById('members-body').innerHTML='<div class="empty">No members found</div>';return;}
+  document.getElementById('members-body').innerHTML=`
+    <table>
+      <thead><tr><th>Member</th><th>User ID</th><th>Admin</th><th>Nickname</th></tr></thead>
+      <tbody>${members.map(m=>`
+        <tr>
+          <td><div class="user-cell">
+            <div class="member-avatar" style="background:${avatarColor(m.userID||m.pk||m.id||'0')}">${avatarInitial(m.name||m.userID||'?')}</div>
+            <div><div style="font-weight:500">${m.name||m.fullName||'Unknown'}</div><div style="font-size:.75rem;color:var(--sub)">@${m.username||'—'}</div></div>
+          </div></td>
+          <td style="font-family:monospace;font-size:.8rem;color:var(--sub)">${m.userID||m.pk||m.id||'—'}</td>
+          <td>${m.isAdmin||m.admin?'<span class="badge badge-yellow">Admin</span>':'—'}</td>
+          <td style="color:var(--sub)">${m.nickname||'—'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function filterMembers(){
+  const q=document.getElementById('member-search').value.toLowerCase();
+  renderMembers(currentThreadMembers.filter(m=>(m.name||'').toLowerCase().includes(q)||(m.username||'').toLowerCase().includes(q)||(m.userID||'').includes(q)));
+}
+
+function backToThreadList(){
+  document.getElementById('thread-list').style.display='block';
+  document.getElementById('thread-detail').style.display='none';
+}
+
+/* ---- USERS ---- */
+async function loadUsers(){
+  const d=await api('/users');
+  if(!d){document.getElementById('users-body').innerHTML='<tr><td colspan="7" class="empty">Failed to load users</td></tr>';return;}
+  allUsers=d.users||[];
+  renderUsers(allUsers,d.economy||{},d.banned||[]);
+}
+
+function renderUsers(users,economy,banned){
+  if(!users.length){document.getElementById('users-body').innerHTML='<tr><td colspan="7" class="empty">No users in database</td></tr>';return;}
+  document.getElementById('users-body').innerHTML=users.map(u=>{
+    const eco=economy[u.id]||{};
+    const isBanned=banned.includes(u.id);
+    return `<tr>
+      <td><div class="user-cell">
+        <div class="avatar" style="background:${avatarColor(u.id)}">${avatarInitial(u.id)}</div>
+        <div style="font-family:monospace;font-size:.82rem">${u.id}</div>
+      </div></td>
+      <td>${(u.messageCount||0).toLocaleString()}</td>
+      <td>${(u.commandCount||0).toLocaleString()}</td>
+      <td>💰 ${(eco.balance||0).toLocaleString()}</td>
+      <td style="font-size:.78rem;color:var(--sub)">${formatDate(u.firstSeen)}</td>
+      <td style="font-size:.78rem;color:var(--sub)">${timeAgo(u.lastSeen)}</td>
+      <td>${isBanned?'<span class="badge badge-red">Banned</span>':'<span class="badge badge-green">Active</span>'}</td>
+    </tr>`;
+  }).join('');
+}
+
+let _lastUsers=null,_lastEco=null,_lastBanned=null;
+const origLoadUsers=loadUsers;
+loadUsers=async function(){
+  const d=await api('/users');
+  if(!d){document.getElementById('users-body').innerHTML='<tr><td colspan="7" class="empty">Failed to load users</td></tr>';return;}
+  allUsers=d.users||[];_lastEco=d.economy||{};_lastBanned=d.banned||[];
+  renderUsers(allUsers,_lastEco,_lastBanned);
+};
+
+function filterUsers(){
+  const q=document.getElementById('user-search').value.toLowerCase();
+  renderUsers(allUsers.filter(u=>u.id.includes(q)),_lastEco||{},_lastBanned||[]);
+}
+
+/* ---- COMMANDS ---- */
+async function loadCommands(){
+  const d=await api('/commands');
+  if(!d){document.getElementById('cmd-categories').innerHTML='<div class="empty">Failed to load commands</div>';return;}
+  allCommands=d.commands||[];
+  renderCommands(allCommands);
+}
+
+function renderCommands(cmds){
+  const cats={};
+  cmds.forEach(c=>{const cat=c.category||'other';if(!cats[cat])cats[cat]=[];cats[cat].push(c);});
+  const emojiMap={ai:'🤖',system:'⚙️',fun:'🎮',economy:'💰',game:'🎲',admin:'👑',owner:'👑',utility:'🛠️',info:'ℹ️',config:'🔧',moderation:'🛡️',other:'📦'};
+  document.getElementById('cmd-categories').innerHTML=Object.keys(cats).sort().map(cat=>`
+    <div style="margin-bottom:24px">
+      <div style="font-size:.9rem;font-weight:600;margin-bottom:12px;color:var(--sub)">${emojiMap[cat]||'📦'} ${cat.toUpperCase()} <span class="badge badge-blue">${cats[cat].length}</span></div>
+      <div class="cmd-grid">${cats[cat].map(c=>`
+        <div class="cmd-card">
+          <div class="cmd-name">${c.prefix||'!'}${c.name}</div>
+          <div class="cmd-desc">${c.description||'No description'}</div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap">
+            ${c.role?`<span class="badge badge-${c.role>=4?'red':c.role>=2?'yellow':'blue'}">Role ${c.role}</span>`:''}
+            ${c.cooldown?`<span class="badge badge-purple">${c.cooldown}s cd</span>`:''}
+            ${c.aliases&&c.aliases.length?`<span class="badge" style="background:rgba(255,255,255,.06);color:var(--sub)">${c.aliases.join(', ')}</span>`:''}
+          </div>
+        </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function filterCommands(){
+  const q=document.getElementById('cmd-search').value.toLowerCase();
+  renderCommands(allCommands.filter(c=>c.name.includes(q)||(c.description||'').toLowerCase().includes(q)||(c.category||'').includes(q)));
+}
+
+/* ---- LOGS ---- */
+async function loadLogs(){
+  const d=await api('/logs');
+  if(!d){document.getElementById('log-box').innerHTML='<div class="empty">Failed to load logs</div>';return;}
+  allLogs=d.logs||[];
+  filterLogs();
+}
+
+function filterLogs(){
+  const lv=document.getElementById('log-level').value;
+  const lines=allLogs.filter(l=>!lv||l.level===lv);
+  const box=document.getElementById('log-box');
+  box.innerHTML=lines.map(l=>`<div class="log-line log-${l.level||'INFO'}"><span style="color:var(--sub)">${l.time||''}</span> <span style="opacity:.6">[${l.level||''}]</span> ${escHtml(l.message||'')}</div>`).join('');
+  box.scrollTop=box.scrollHeight;
+}
+
+function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function toggleAutoRefresh(){
+  autoRefreshLogs=!autoRefreshLogs;
+  document.getElementById('auto-refresh-btn').textContent=autoRefreshLogs?'⏸ Auto ON':'⏸ Auto OFF';
+  if(autoRefreshLogs){autoRefreshTimer=setInterval(loadLogs,3000);}
+  else{clearInterval(autoRefreshTimer);}
+}
+
+/* Boot */
+window.addEventListener('load',()=>{
+  loadOverview();
+  setInterval(loadOverview,15000);
+});
+</script>
+</body>
+</html>

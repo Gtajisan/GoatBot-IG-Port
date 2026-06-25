@@ -30,20 +30,162 @@ class InstagramBot {
 
   startHealthServer() {
     const port = parseInt(process.env.PORT || config.DASHBOARD_PORT || 3000, 10);
-    const server = http.createServer((req, res) => {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        status: 'ok',
-        bot: config.BOT_NAME,
-        version: config.BOT_VERSION,
-        uptime: Math.floor(process.uptime())
-      }));
+    const fs2  = require('fs');
+    const path = require('path');
+
+    const dashboardHtml = path.join(__dirname, '..', 'dashboard', 'index.html');
+
+    const recentActivity = [];
+    this._logActivity = (text) => {
+      recentActivity.unshift({ text, time: Date.now() });
+      if (recentActivity.length > 20) recentActivity.pop();
+    };
+
+    const server = http.createServer(async (req, res) => {
+      const url = req.url.split('?')[0];
+
+      // ── Dashboard HTML ──────────────────────────────────────────────
+      if (url === '/' || url === '/dashboard') {
+        try {
+          const html = fs2.readFileSync(dashboardHtml, 'utf-8');
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          return res.end(html);
+        } catch {
+          res.writeHead(500); return res.end('Dashboard not found');
+        }
+      }
+
+      // ── API routes ──────────────────────────────────────────────────
+      const json = (data) => {
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify(data));
+      };
+
+      if (!url.startsWith('/api/')) {
+        res.writeHead(404); return res.end('Not Found');
+      }
+
+      const route = url.slice(4); // strip /api
+
+      // GET /api/status
+      if (route === '/status') {
+        const database = require('../utils/database');
+        const mem  = process.memoryUsage();
+        const users = database.getAllUsers();
+        return json({
+          connected:    this.isRunning,
+          userID:       this.userID,
+          username:     this.username,
+          botName:      config.BOT_NAME || config.NICK_NAME_BOT || 'GoatBot-IG',
+          version:      config.BOT_VERSION || '1.0.0',
+          uptime:       Math.floor(process.uptime()),
+          prefix:       config.PREFIX || '!',
+          commandCount: this.commandLoader.getAllCommandNames().length,
+          eventCount:   this.eventLoader.getAllEventNames().length,
+          memory:       { heapUsed: mem.heapUsed, heapTotal: mem.heapTotal, rss: mem.rss },
+          nodeVersion:  process.version,
+          platform:     process.platform,
+          arch:         process.arch,
+          totalUsers:   users.length,
+          stats:        database.getAllStats(),
+          recentActivity
+        });
+      }
+
+      // GET /api/threads
+      if (route === '/threads') {
+        try {
+          const inbox = await this.ig.getInbox({ limit: 40 });
+          const threads = (inbox?.threads || inbox?.items || []).map(t => ({
+            threadID:        t.thread_id || t.threadID || t.id,
+            name:            t.thread_title || t.name || t.title || '',
+            isGroup:         t.is_group || t.isGroup || false,
+            participantCount: (t.users||t.participants||[]).length,
+            snippet:         t.last_permanent_item?.text || t.snippet || ''
+          }));
+          return json({ threads });
+        } catch (e) {
+          return json({ threads: [], error: e.message });
+        }
+      }
+
+      // GET /api/thread/:id
+      const threadMatch = route.match(/^\/thread\/(.+)$/);
+      if (threadMatch) {
+        const threadID = threadMatch[1];
+        try {
+          const info = await this.ig.getThreadInfo(threadID);
+          const raw  = info || {};
+          const participants = (raw.users || raw.participants || raw.items || []).map(u => ({
+            userID:   u.pk || u.id || u.user_id || u.userID,
+            name:     u.full_name || u.fullName || u.name || '',
+            username: u.username || '',
+            isAdmin:  u.is_admin || u.isAdmin || false,
+            nickname: u.nickname || ''
+          }));
+          return json({ threadID, participants, raw: { name: raw.thread_title || '', isGroup: raw.is_group } });
+        } catch (e) {
+          return json({ threadID, participants: [], error: e.message });
+        }
+      }
+
+      // GET /api/users
+      if (route === '/users') {
+        const database = require('../utils/database');
+        const users  = database.getAllUsers().sort((a, b) => (b.messageCount||0) - (a.messageCount||0));
+        const economy = database.data.economy || {};
+        const banned  = [...(database.data.bannedUsers || [])];
+        return json({ users, economy, banned });
+      }
+
+      // GET /api/commands
+      if (route === '/commands') {
+        const cmds = [];
+        for (const [key, cmd] of this.commandLoader.commands) {
+          if (cmd.config.name !== key) continue;
+          cmds.push({
+            name:        cmd.config.name,
+            description: cmd.config.description || '',
+            category:    cmd.config.category || 'other',
+            aliases:     cmd.config.aliases || [],
+            role:        cmd.config.role || 0,
+            cooldown:    cmd.config.cooldown || 0,
+            usage:       cmd.config.usage || '',
+            prefix:      config.PREFIX || '!'
+          });
+        }
+        return json({ commands: cmds.sort((a,b) => a.name.localeCompare(b.name)) });
+      }
+
+      // GET /api/logs
+      if (route === '/logs') {
+        const logFile = path.join(__dirname, '..', 'storage', 'logs', 'combined.log');
+        try {
+          let raw = '';
+          if (fs2.existsSync(logFile)) raw = fs2.readFileSync(logFile, 'utf-8');
+          const logs = raw.trim().split('\n').filter(Boolean).slice(-300).map(line => {
+            try {
+              const parsed = JSON.parse(line);
+              return { time: parsed.timestamp || parsed.time || '', level: parsed.level?.toUpperCase() || 'INFO', message: parsed.message || line };
+            } catch {
+              const m = line.match(/\[([\d:]+)\].*?(INFO|WARN|ERROR|DEBUG).*?(.+)/);
+              return m ? { time: m[1], level: m[2], message: m[3].trim() } : { time: '', level: 'INFO', message: line };
+            }
+          });
+          return json({ logs: logs.reverse() });
+        } catch (e) {
+          return json({ logs: [], error: e.message });
+        }
+      }
+
+      res.writeHead(404); res.end('Not found');
     });
+
     server.listen(port, '0.0.0.0', () => {
-      logger.info(`Health server listening on port ${port}`);
+      logger.info(`Dashboard running on port ${port} — visit / to open`);
     });
     server.on('error', err => {
-      logger.error('Health server error', { error: err.message });
+      logger.error('Dashboard server error', { error: err.message });
     });
     return server;
   }
@@ -209,6 +351,11 @@ class InstagramBot {
       const database = require('../utils/database');
       if (database.isMessageProcessed(msgKey)) return;
       database.markMessageAsProcessed(msgKey);
+
+      if (this._logActivity && event.body) {
+        const preview = event.body.slice(0, 60) + (event.body.length > 60 ? '...' : '');
+        this._logActivity(`Message from ${senderID} in ${threadID}: "${preview}"`);
+      }
 
       const normalizedEvent = {
         threadID,
