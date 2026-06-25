@@ -1,4 +1,4 @@
-const logger = require('./index.js');
+const logger = require('../utils/logger');
 
 function formatAndLog(level, args) {
     let tag = '';
@@ -28,7 +28,7 @@ function formatAndLog(level, args) {
     });
 }
 
-module.exports = {
+const logBridge = {
     err: (...args) => formatAndLog('error', args),
     error: (...args) => formatAndLog('error', args),
     warn: (...args) => formatAndLog('warn', args),
@@ -40,3 +40,5 @@ module.exports = {
         if (process.env.NODE_ENV === 'development') formatAndLog('debug', ['DEV', ...args]);
     }
 };
+
+module.exports = logBridge;

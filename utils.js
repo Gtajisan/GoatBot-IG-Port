@@ -15,7 +15,6 @@ const log = require("./logger/log.js");
 const { isHexColor, colors } = require("./func/colors.js");
 const Prism = require("./func/prism.js");
 
-// ...existing code...
 const word = [
 	'A', 'Á', 'À', 'Ả', 'Ã', 'Ạ', 'a', 'á', 'à', 'ả', 'ã', 'ạ',
 	'Ă', 'Ắ', 'Ằ', 'Ẳ', 'Ẵ', 'Ặ', 'ă', 'ắ', 'ằ', 'ẳ', 'ẵ', 'ặ',
@@ -222,7 +221,9 @@ function getExtFromUrl(url = "") {
 	if (!url || typeof url !== "string")
 		throw new Error('The first argument (url) must be a string');
 	const reg = /(?<=https:\/\/cdn.fbsbx.com\/v\/.*?\/|https:\/\/video.xx.fbcdn.net\/v\/.*?\/|https:\/\/scontent.xx.fbcdn.net\/v\/.*?\/).*?(\/|\?)/g;
-	const fileName = url.match(reg)[0].slice(0, -1);
+	const match = url.match(reg);
+	if (!match) return "png";
+	const fileName = match[0].slice(0, -1);
 	return fileName.slice(fileName.lastIndexOf(".") + 1);
 }
 
@@ -231,9 +232,9 @@ function getPrefix(threadID) {
 		throw new Error('The first argument (threadID) must be a number');
 	threadID = String(threadID);
 	let prefix = global.GoatBot.config.prefix;
-	const threadData = global.db.allThreadData.find(t => t.threadID == threadID);
+	const threadData = global.db.getThreadData(threadID);
 	if (threadData)
-		prefix = threadData.data.prefix || prefix;
+		prefix = threadData.prefix || prefix;
 	return prefix;
 }
 
@@ -664,76 +665,6 @@ async function uploadImgbb(file /* stream or image url */) {
 		});
 
 		return res.data;
-		// {
-		// 	"status_code": 200,
-		// 	"success": {
-		// 		"message": "image uploaded",
-		// 		"code": 200
-		// 	},
-		// 	"image": {
-		// 		"name": "Banner-Project-Goat-Bot",
-		// 		"extension": "png",
-		// 		"width": 2560,
-		// 		"height": 1440,
-		// 		"size": 194460,
-		// 		"time": 1688352855,
-		// 		"expiration": 0,
-		// 		"likes": 0,
-		// 		"description": null,
-		// 		"original_filename": "Banner Project Goat Bot.png",
-		// 		"is_animated": 0,
-		// 		"is_360": 0,
-		// 		"nsfw": 0,
-		// 		"id_encoded": "D1yzzdr",
-		// 		"size_formatted": "194.5 KB",
-		// 		"filename": "Banner-Project-Goat-Bot.png",
-		// 		"url": "https://i.ibb.co/wdXBBtc/Banner-Project-Goat-Bot.png",  // => this is url image
-		// 		"url_viewer": "https://ibb.co/D1yzzdr",
-		// 		"url_viewer_preview": "https://ibb.co/D1yzzdr",
-		// 		"url_viewer_thumb": "https://ibb.co/D1yzzdr",
-		// 		"image": {
-		// 			"filename": "Banner-Project-Goat-Bot.png",
-		// 			"name": "Banner-Project-Goat-Bot",
-		// 			"mime": "image/png",
-		// 			"extension": "png",
-		// 			"url": "https://i.ibb.co/wdXBBtc/Banner-Project-Goat-Bot.png",
-		// 			"size": 194460
-		// 		},
-		// 		"thumb": {
-		// 			"filename": "Banner-Project-Goat-Bot.png",
-		// 			"name": "Banner-Project-Goat-Bot",
-		// 			"mime": "image/png",
-		// 			"extension": "png",
-		// 			"url": "https://i.ibb.co/D1yzzdr/Banner-Project-Goat-Bot.png"
-		// 		},
-		// 		"medium": {
-		// 			"filename": "Banner-Project-Goat-Bot.png",
-		// 			"name": "Banner-Project-Goat-Bot",
-		// 			"mime": "image/png",
-		// 			"extension": "png",
-		// 			"url": "https://i.ibb.co/tHtQQRL/Banner-Project-Goat-Bot.png"
-		// 		},
-		// 		"display_url": "https://i.ibb.co/tHtQQRL/Banner-Project-Goat-Bot.png",
-		// 		"display_width": 2560,
-		// 		"display_height": 1440,
-		// 		"delete_url": "https://ibb.co/D1yzzdr/<TOKEN>",
-		// 		"views_label": "lượt xem",
-		// 		"likes_label": "thích",
-		// 		"how_long_ago": "mới đây",
-		// 		"date_fixed_peer": "2023-07-03 02:54:15",
-		// 		"title": "Banner-Project-Goat-Bot",
-		// 		"title_truncated": "Banner-Project-Goat-Bot",
-		// 		"title_truncated_html": "Banner-Project-Goat-Bot",
-		// 		"is_use_loader": false
-		// 	},
-		// 	"request": {
-		// 		"type": "file",
-		// 		"action": "upload",
-		// 		"timestamp": "1688352853967",
-		// 		"auth_token": "a2606b39536a05a81bef15558bb0d61f7253dccb"
-		// 	},
-		// 	"status_txt": "OK"
-		// }
 	}
 	catch (err) {
 		throw new CustomError(err.response ? err.response.data : err);
@@ -768,8 +699,6 @@ async function uploadZippyshare(stream) {
 
 	return res.data;
 }
-
-// Removed Google Drive integration (driveApi) as credentials system is no longer present.
 
 class GoatBotApis {
 	constructor(apiKey) {
@@ -935,7 +864,7 @@ const utils = {
 			return await fn();
 		} catch (error) {
 			if (retries <= 0) throw error;
-			const errorMessage = error.message || String(error);
+			const errorMessage = (error.message || String(error)).toLowerCase();
 			if (errorMessage.includes('rate limit') || errorMessage.includes('spam') || errorMessage.includes('429')) {
 				const backoffDelay = delay * 2;
 				utils.log.warn('BACKOFF', `Rate limit hit, retrying in ${backoffDelay}ms... (Retries left: ${retries})`);

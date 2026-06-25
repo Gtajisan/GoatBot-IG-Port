@@ -43,6 +43,10 @@
     "autoRefreshThreadInfoFirstTime": true
   },
   "messageDelayMs": 100,
+  "humanDelay": {
+    "min": 500,
+    "max": 2000
+  },
   "timeZone": "Asia/Dhaka",
   "dashBoard": {
     "enable": false,
@@ -75,6 +79,10 @@
     "enable": false,
     "ignoreCmds": "",
     "ignoreEvents": ""
+  },
+  "aiFallback": {
+    "enable": false,
+    "command": "gpt"
   },
   "autoRefreshFbstate": true,
   "autoReloginWhenChangeAccount": false,

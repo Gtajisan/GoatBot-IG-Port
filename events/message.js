@@ -48,7 +48,17 @@ module.exports = {
       const startsWithPrefix = event.body.startsWith(prefix);
       const noPrefixAllowed  = config.NO_PREFIX && PermissionManager.canUseNoPrefix(event.senderID);
 
-      if (!startsWithPrefix && !noPrefixAllowed) return;
+      if (!startsWithPrefix && !noPrefixAllowed) {
+        // AI Fallback logic
+        if (config.AI_FALLBACK.enable && config.AI_FALLBACK.command) {
+          const aiCommand = commandLoader.getCommand(config.AI_FALLBACK.command);
+          if (aiCommand) {
+             const args = event.body.trim().split(/ +/);
+             await this.executeCommand(aiCommand, { api, event, args, bot, commandName: config.AI_FALLBACK.command, user });
+          }
+        }
+        return;
+      }
 
       let rawBody = event.body;
       if (startsWithPrefix) rawBody = event.body.slice(prefix.length);
@@ -108,33 +118,38 @@ module.exports = {
         return;
       }
 
-      try {
-        Banner.commandExecuted(command.config.name, event.senderID, true);
-        user.commandCount = (user.commandCount || 0) + 1;
-        database.updateUser(event.senderID, user);
-        database.incrementStat('totalCommands');
+      await this.executeCommand(command, { api, event, args, bot, commandName: command.config.name, user });
+      if (cooldownTime > 0) commandLoader.setCooldown(event.senderID, command.config.name, cooldownTime);
 
-        const replyApi = new Proxy(api, {
-          get(target, prop) {
-            if (prop === 'sendMessage') {
-              return async (text, threadID) => {
-                try { return await target.replyToMessage(threadID, text, event.messageID); }
-                catch (_) { return await target.sendMessage(text, threadID); }
-              };
-            }
-            return target[prop];
-          }
-        });
-
-        await command.run({ api: replyApi, event, args, bot, commandName: command.config.name, logger, database, config, PermissionManager, ConfigManager });
-        if (cooldownTime > 0) commandLoader.setCooldown(event.senderID, command.config.name, cooldownTime);
-      } catch (e) {
-        logger.error(`Command error: ${command.config.name}`, { error: e.message });
-        Banner.commandExecuted(command.config.name, event.senderID, false);
-        await api.sendMessage(`❌ Error: ${e.message}`, event.threadId);
-      }
     } catch (e) {
       logger.error('Error in message event handler', { error: e.message, stack: e.stack });
+    }
+  },
+
+  async executeCommand(command, { api, event, args, bot, commandName, user }) {
+    try {
+      Banner.commandExecuted(commandName, event.senderID, true);
+      user.commandCount = (user.commandCount || 0) + 1;
+      database.updateUser(event.senderID, user);
+      database.incrementStat('totalCommands');
+
+      const replyApi = new Proxy(api, {
+        get(target, prop) {
+          if (prop === 'sendMessage') {
+            return async (text, threadID) => {
+              try { return await target.replyToMessage(threadID, text, event.messageID); }
+              catch (_) { return await target.sendMessage(text, threadID); }
+            };
+          }
+          return target[prop];
+        }
+      });
+
+      await command.run({ api: replyApi, event, args, bot, commandName, logger, database, config, PermissionManager, ConfigManager });
+    } catch (e) {
+      logger.error(`Command error: ${commandName}`, { error: e.message });
+      Banner.commandExecuted(commandName, event.senderID, false);
+      await api.sendMessage(`❌ Error: ${e.message}`, event.threadId);
     }
   },
 
