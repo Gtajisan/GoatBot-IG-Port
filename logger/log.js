@@ -1,12 +1,5 @@
 const logger = require('./index.js');
 
-/**
- * Robust bridge to the central Winston logger.
- * Supports:
- *   - log.info("TAG", "Message", { meta: 'data' })
- *   - log.info("Message only")
- *   - log.info("TAG", "Message with %s formatting", "args")
- */
 function formatAndLog(level, args) {
     let tag = '';
     let message = '';
@@ -19,12 +12,7 @@ function formatAndLog(level, args) {
             tag = args[0];
             message = args[1];
             if (args.length > 2) {
-                if (typeof args[2] === 'object' && !Array.isArray(args[2])) {
-                    meta = args[2];
-                } else {
-                    // Treat remaining args as format parameters or just meta
-                    meta = { details: args.slice(2) };
-                }
+                meta = typeof args[2] === 'object' && !Array.isArray(args[2]) ? args[2] : { details: args.slice(2) };
             }
         } else {
             message = args[0];
@@ -40,7 +28,7 @@ function formatAndLog(level, args) {
     });
 }
 
-const bridge = {
+module.exports = {
     err: (...args) => formatAndLog('error', args),
     error: (...args) => formatAndLog('error', args),
     warn: (...args) => formatAndLog('warn', args),
@@ -49,10 +37,6 @@ const bridge = {
     debug: (...args) => formatAndLog('debug', args),
     master: (...args) => formatAndLog('info', ['MASTER', ...args]),
     dev: (...args) => {
-        if (process.env.NODE_ENV === 'development') {
-            formatAndLog('debug', ['DEV', ...args]);
-        }
+        if (process.env.NODE_ENV === 'development') formatAndLog('debug', ['DEV', ...args]);
     }
 };
-
-module.exports = bridge;
