@@ -905,8 +905,11 @@ const utils = {
 	 * @param {number} max Maximum delay in ms
 	 * @returns {Promise<void>}
 	 */
-	humanDelay: async (min = 500, max = 2000) => {
-		const delay = Math.floor(Math.random() * (max - min + 1)) + min;
+	humanDelay: async (min, max) => {
+		const config = global.GoatBot?.config?.humanDelay || {};
+		const minDelay = min || config.min || 500;
+		const maxDelay = max || config.max || 2000;
+		const delay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
 		return new Promise(resolve => setTimeout(resolve, delay));
 	},
 
@@ -932,14 +935,22 @@ const utils = {
 			return await fn();
 		} catch (error) {
 			if (retries <= 0) throw error;
-			if (error.message && (error.message.includes('rate limit') || error.message.includes('spam'))) {
+			const errorMessage = error.message || String(error);
+			if (errorMessage.includes('rate limit') || errorMessage.includes('spam') || errorMessage.includes('429')) {
 				const backoffDelay = delay * 2;
-				utils.log.warn('BACKOFF', `Rate limit hit, retrying in ${backoffDelay}ms...`);
+				utils.log.warn('BACKOFF', `Rate limit hit, retrying in ${backoffDelay}ms... (Retries left: ${retries})`);
 				await new Promise(resolve => setTimeout(resolve, backoffDelay));
 				return utils.withBackoff(fn, retries - 1, backoffDelay);
 			}
 			throw error;
 		}
+	},
+
+	/**
+	 * Gets stream from attachment or URL with better error handling and backoff
+	 */
+	getStream: async (url, pathName, options = {}) => {
+		return await utils.withBackoff(() => utils.getStreamFromURL(url, pathName, options));
 	}
 };
 

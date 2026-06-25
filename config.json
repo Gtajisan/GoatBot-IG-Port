@@ -28,11 +28,15 @@
     "enable": true,
     "min": 500,
     "max": 2000,
-    "typingIndicator": true
+    "typingIndicator": true,
+    "readReceipt": true
   },
   "logging": {
     "logLevel": "info",
-    "logToFile": true
+    "logToFile": true,
+    "maxFiles": "14d",
+    "maxSize": "20m",
+    "webhookUrl": ""
   },
   "aiFallback": {
     "enable": false,
