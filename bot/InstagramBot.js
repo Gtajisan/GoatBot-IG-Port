@@ -47,7 +47,11 @@ class InstagramBot {
       logger.info(`Health server listening on port ${port}`);
     });
     server.on('error', err => {
-      logger.error('Health server error', { error: err.message });
+      if (err.code === 'EADDRINUSE') {
+        logger.warn(`Port ${port} is already in use. Health server will not be started on this port.`);
+      } else {
+        logger.error('Health server error', { error: err.message });
+      }
     });
     return server;
   }
@@ -62,6 +66,7 @@ class InstagramBot {
       this.startHealthServer();
 
       const database = require('../utils/database');
+      // Wait for database to be ready before loading commands/events
       await database.ready;
 
       // Set up global.utils / global.GoatBot BEFORE loading commands —

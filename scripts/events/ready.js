@@ -1,8 +1,8 @@
 'use strict';
 
-const logger = require('../utils/logger');
-const Banner = require('../utils/banner');
-const config = require('../config');
+const logger = require('../../utils/logger');
+const Banner = require('../../utils/banner');
+const config = require('../../config');
 
 module.exports = {
   config: { name: 'ready', description: 'Fired once the bot connects to Instagram' },

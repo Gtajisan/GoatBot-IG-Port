@@ -53,7 +53,11 @@ class CommandLoader {
 
         this.commands.set(cfg.name.toLowerCase(), commandModule);
         for (const alias of cfg.aliases) {
-          this.commands.set(alias.toLowerCase(), commandModule);
+          const lowerAlias = alias.toLowerCase();
+          this.commands.set(lowerAlias, commandModule);
+          if (global.GoatBot && global.GoatBot.aliases) {
+            global.GoatBot.aliases.set(lowerAlias, cfg.name.toLowerCase());
+          }
         }
         loaded++;
         logger.info(`Loaded command: ${cfg.name}${commandModule._isGoatV2 ? ' (GoatV2)' : ''}`);

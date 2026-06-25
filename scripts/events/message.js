@@ -1,13 +1,13 @@
 'use strict';
 
-const config          = require('../config');
-const logger          = require('../utils/logger');
-const PermissionManager = require('../utils/permissions');
-const Banner          = require('../utils/banner');
-const database        = require('../utils/database');
-const moderation      = require('../utils/moderation');
-const ConfigManager   = require('../utils/configManager');
-const { buildGoatV2Params } = require('../utils/goatcompat');
+const config          = require('../../config');
+const logger          = require('../../utils/logger');
+const PermissionManager = require('../../utils/permissions');
+const Banner          = require('../../utils/banner');
+const database        = require('../../utils/database');
+const moderation      = require('../../utils/moderation');
+const ConfigManager   = require('../../utils/configManager');
+const { buildGoatV2Params } = require('../../utils/goatcompat');
 
 module.exports = {
   config: {
