@@ -1,0 +1,40 @@
+# Netscape HTTP Cookie File
+# ============================================================
+#  GoatBot-IG — Instagram Cookie File
+# ============================================================
+#
+#  HOW TO FILL THIS FILE:
+#  1. Go to https://www.instagram.com in your browser
+#  2. Log into your bot's Instagram account
+#  3. Install "Cookie-Editor" browser extension:
+#       Chrome: https://chrome.google.com/webstore/detail/cookie-editor/hlkenndednhfkekhgcdicdfddnkalmdm
+#       Firefox: https://addons.mozilla.org/en-US/firefox/addon/cookie-editor/
+#  4. Click the Cookie-Editor icon → click "Export" → select "Netscape" format
+#  5. Copy the exported text and REPLACE everything below (keep this header)
+#  6. Save the file and start the bot
+#
+#  IMPORTANT:
+#  - Columns are separated by TAB characters (\t), not spaces
+#  - The most important cookie is "sessionid" — the bot won't start without it
+#  - NEVER share this file — it gives full access to your Instagram account
+#  - Add "account.txt" to your .gitignore before pushing to GitHub
+#
+#  REQUIRED COOKIES:
+#    sessionid   ← session token (most important)
+#    ds_user_id  ← your Instagram numeric user ID
+#    csrftoken   ← anti-CSRF token
+#
+# ============================================================
+#  PASTE YOUR EXPORTED NETSCAPE COOKIES BELOW THIS LINE:
+# ============================================================
+#
+# Example format (replace with your real cookies):
+#
+# #HttpOnly_.instagram.com	TRUE	/	TRUE	1999999999	datr	REPLACE_WITH_REAL_VALUE
+# .instagram.com	TRUE	/	TRUE	1999999999	ds_user_id	YOUR_NUMERIC_UID_HERE
+# .instagram.com	TRUE	/	TRUE	1999999999	csrftoken	YOUR_CSRF_TOKEN_HERE
+# #HttpOnly_.instagram.com	TRUE	/	TRUE	1999999999	ig_did	XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+# #HttpOnly_.instagram.com	TRUE	/	TRUE	1999999999	sessionid	YOUR_UID%3AYOUR_SESSION_TOKEN_HERE
+# .instagram.com	TRUE	/	TRUE	1999999999	mid	REPLACE_WITH_REAL_VALUE
+#
+# ============================================================
