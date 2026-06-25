@@ -13,7 +13,7 @@ if (!fs.existsSync(logDir)) {
 
 let config = {};
 try {
-    const configPath = path.join(process.cwd(), 'config.json');
+    const configPath = path.join(process.cwd(), 'config_goatbot_v2.json');
     if (fs.existsSync(configPath)) {
         config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     }

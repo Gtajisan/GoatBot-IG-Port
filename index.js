@@ -1,10 +1,10 @@
-/**
- * GoatBot V2 - Instagram Port
- * 
- * Main entry point for the Instagram GoatBot
- * Based on NTKhang's GoatBot V2 (Team Calyx)
- */
+'use strict';
 
-"use strict";
+const InstagramBot = require('./bot/InstagramBot');
 
-require("./InstagramGoat.js");
+const bot = new InstagramBot();
+
+bot.start().catch(error => {
+  console.error('Fatal error:', error.message);
+  process.exit(1);
+});

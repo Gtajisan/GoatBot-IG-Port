@@ -1,0 +1,104 @@
+{
+  "instagramAccount": {
+    "email": "",
+    "password": "",
+    "2FASecret": "",
+    "i_user": "",
+    "proxy": null,
+    "userAgent": "Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
+    "intervalGetNewCookie": 1440,
+    "notes": "Put your Instagram cookies in account.txt (Netscape cookie format). OR set IG_USERNAME and IG_PASSWORD environment variables for email/password login."
+  },
+  "antiInbox": false,
+  "language": "en",
+  "nickNameBot": "GoatBot-IG",
+  "prefix": "/",
+  "noPrefix": false,
+  "adminOnly": {
+    "enable": false,
+    "ignoreCommand": []
+  },
+  "adminBot": ["17841449224751608"],
+  "premiumUsers": ["17841449224751608"],
+  "devUsers": ["17841449224751608"],
+  "whiteListMode": {
+    "enable": false,
+    "whiteListIds": []
+  },
+  "whiteListModeThread": {
+    "enable": false,
+    "whiteListThreadIds": []
+  },
+  "database": {
+    "type": "json",
+    "uriMongodb": "",
+    "autoSave": true,
+    "saveIntervalMinutes": 1
+  },
+  "messageDelayMs": 100,
+  "timeZone": "Asia/Dhaka",
+  "dashBoard": {
+    "enable": true,
+    "port": 3000
+  },
+  "spamProtection": {
+    "commandThreshold": 8,
+    "timeWindow": 10,
+    "banDuration": 24
+  },
+  "autoRestart": {
+    "time": null
+  },
+  "autoUptime": {
+    "enable": false,
+    "timeInterval": 180,
+    "url": ""
+  },
+  "autoLoadScripts": {
+    "enable": false,
+    "ignoreCmds": "",
+    "ignoreEvents": ""
+  },
+  "autoRefreshFbstate": true,
+  "autoReloginWhenChangeAccount": false,
+  "autoRestartWhenListenMqttError": false,
+  "restartListenMqtt": {
+    "enable": true,
+    "timeRestart": 3600000,
+    "delayAfterStopListening": 2000,
+    "logNoti": true
+  },
+  "notiWhenListenMqttError": {
+    "telegram": { "enable": false, "botToken": "", "chatId": "" },
+    "discordHook": { "enable": false, "webhookUrl": "" }
+  },
+  "hideNotiMessage": {
+    "commandNotFound": false,
+    "adminOnly": false,
+    "threadBanned": false,
+    "userBanned": false,
+    "needRoleToUseCmd": false
+  },
+  "logEvents": {
+    "disableAll": false,
+    "message": true,
+    "message_reaction": true,
+    "event": true
+  },
+  "typingIndicator": {
+    "enable": true,
+    "duration": 500
+  },
+  "optionsFca": {
+    "online": true,
+    "selfListen": false,
+    "selfListenEvent": true,
+    "listenEvents": true,
+    "listenTyping": false,
+    "updatePresence": false,
+    "autoMarkDelivery": false,
+    "autoMarkRead": true,
+    "autoReconnect": true,
+    "forceLogin": true
+  }
+}
