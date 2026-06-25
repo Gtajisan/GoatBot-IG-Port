@@ -143,11 +143,21 @@ module.exports = {
   DATA_PATH:     './storage/data',
   TEMP_PATH:     './temp',
 
-  LOG_LEVEL:              process.env.LOG_LEVEL || 'info',
-  ENABLE_FILE_LOGGING:    true,
+  LOG_LEVEL:              process.env.LOG_LEVEL || c.logging?.logLevel || 'info',
+  ENABLE_FILE_LOGGING:    c.logging?.logToFile !== false,
   ENABLE_CONSOLE_LOGGING: true,
+  WEBHOOK_URL:            c.logging?.webhookUrl || null,
 
   MESSAGE_DELAY_MS: c.messageDelayMs ?? 100,
+  HUMAN_DELAY: {
+    min: c.humanDelay?.min ?? 500,
+    max: c.humanDelay?.max ?? 2000
+  },
+
+  AI_FALLBACK: {
+    enable: c.aiFallback?.enable ?? false,
+    command: c.aiFallback?.command || 'gpt'
+  },
 
   AUTO_RECONNECT:         true,
   MAX_RECONNECT_ATTEMPTS: 5,

@@ -11,6 +11,8 @@ const logger = require('../utils/logger');
 const CommandLoader = require('../utils/commandLoader');
 const EventLoader   = require('../utils/eventLoader');
 const Banner        = require('../utils/banner');
+const utils         = require('../utils');
+const database      = require('../utils/database');
 
 class InstagramBot {
   constructor() {
@@ -26,6 +28,18 @@ class InstagramBot {
     this._mqttRestartTimer  = null;
     this._cookieRefreshTimer = null;
     this._reminderTimer     = null;
+
+    // Initialize global bridges for GoatBot V2 compatibility
+    global.GoatBot = {
+      config,
+      commands: this.commandLoader.commands,
+      aliases: new Map(), // To be populated by command loader if needed
+      onReply: new Map(),
+      onReaction: new Map(),
+      onEvent: new Map(),
+      onAnyEvent: new Map()
+    };
+    global.utils = utils;
   }
 
   startHealthServer() {
@@ -69,7 +83,6 @@ class InstagramBot {
 
       // GET /api/status
       if (route === '/status') {
-        const database = require('../utils/database');
         const mem  = process.memoryUsage();
         const users = database.getAllUsers();
         return json({
@@ -131,7 +144,6 @@ class InstagramBot {
 
       // GET /api/users
       if (route === '/users') {
-        const database = require('../utils/database');
         const users  = database.getAllUsers().sort((a, b) => (b.messageCount||0) - (a.messageCount||0));
         const economy = database.data.economy || {};
         const banned  = [...(database.data.bannedUsers || [])];
@@ -159,16 +171,19 @@ class InstagramBot {
 
       // GET /api/logs
       if (route === '/logs') {
-        const logFile = path.join(__dirname, '..', 'storage', 'logs', 'combined.log');
+        const logsDir = config.LOGS_PATH || './storage/logs';
+        // Pick the latest combined log
         try {
+          const files = fs.readdirSync(logsDir).filter(f => f.startsWith('combined-') && f.endsWith('.log')).sort().reverse();
           let raw = '';
-          if (fs2.existsSync(logFile)) raw = fs2.readFileSync(logFile, 'utf-8');
+          if (files.length > 0) raw = fs.readFileSync(path.join(logsDir, files[0]), 'utf-8');
+
           const logs = raw.trim().split('\n').filter(Boolean).slice(-300).map(line => {
             try {
               const parsed = JSON.parse(line);
               return { time: parsed.timestamp || parsed.time || '', level: parsed.level?.toUpperCase() || 'INFO', message: parsed.message || line };
             } catch {
-              const m = line.match(/\[([\d:]+)\].*?(INFO|WARN|ERROR|DEBUG).*?(.+)/);
+              const m = line.match(/\[([\d:-]+)\]\s+(INFO|WARN|ERROR|DEBUG|SUCCESS)\s+(.+)/);
               return m ? { time: m[1], level: m[2], message: m[3].trim() } : { time: '', level: 'INFO', message: line };
             }
           });
@@ -185,7 +200,11 @@ class InstagramBot {
       logger.info(`Dashboard running on port ${port} — visit / to open`);
     });
     server.on('error', err => {
-      logger.error('Dashboard server error', { error: err.message });
+      if (err.code === 'EADDRINUSE') {
+        logger.warn(`Port ${port} in use, dashboard server failed to start but bot will continue.`);
+      } else {
+        logger.error('Dashboard server error', { error: err.message });
+      }
     });
     return server;
   }
@@ -197,7 +216,6 @@ class InstagramBot {
 
       this.startHealthServer();
 
-      const database = require('../utils/database');
       await database.ready;
 
       await this.commandLoader.loadCommands();
@@ -273,7 +291,7 @@ class InstagramBot {
     this.api               = this.createAPIWrapper();
     this.reconnectAttempts = 0;
     this.isRunning         = true;
-    logger.info('Connected to Instagram', { userID: this.userID });
+    logger.success('Connected to Instagram', { userID: this.userID });
 
     this.eventLoader.handleEvent('ready', {}).then(() => {
       this.startListening();
@@ -348,7 +366,6 @@ class InstagramBot {
       if ((timestamp || 0) < fiveMinutesAgo && timestamp) return;
 
       const msgKey  = messageID ? `${threadID}-${messageID}` : `${threadID}-${timestamp}`;
-      const database = require('../utils/database');
       if (database.isMessageProcessed(msgKey)) return;
       database.markMessageAsProcessed(msgKey);
 
@@ -461,6 +478,11 @@ class InstagramBot {
   createAPIWrapper() {
     const ig = this.ig;
 
+    const withDelay = async (fn) => {
+      await utils.humanDelay();
+      return await fn();
+    };
+
     return {
       sendMessage: async (text, threadID) => {
         try {
@@ -468,10 +490,9 @@ class InstagramBot {
             try { ig.sendTypingIndicator(threadID); } catch (_) {}
             await this._sleep(config.TYPING_INDICATOR_DURATION);
           }
-          const result = await ig.sendMessage(text, threadID);
+          const result = await withDelay(() => ig.sendMessage(text, threadID));
           if (result?.messageID) {
-            const db = require('../utils/database');
-            db.storeSentMessage(threadID, result.messageID);
+            database.storeSentMessage(threadID, result.messageID);
           }
           return result;
         } catch (error) {
@@ -482,7 +503,7 @@ class InstagramBot {
 
       sendMessageToUser: async (userID, text) => {
         try {
-          return await ig.sendDirectMessage(userID, text);
+          return await withDelay(() => ig.sendDirectMessage(userID, text));
         } catch (error) {
           logger.error('Failed to send direct message', { error: error.message, userID });
           throw error;
@@ -521,7 +542,7 @@ class InstagramBot {
             try { ig.sendTypingIndicator(threadID); } catch (_) {}
             await this._sleep(config.TYPING_INDICATOR_DURATION);
           }
-          return await ig.sendPhoto(threadID, photoPath, {});
+          return await withDelay(() => ig.sendPhoto(threadID, photoPath, {}));
         } catch (error) {
           logger.error('Failed to send photo', { error: error.message, threadID });
           throw error;
@@ -534,7 +555,7 @@ class InstagramBot {
             try { ig.sendTypingIndicator(threadID); } catch (_) {}
             await this._sleep(config.TYPING_INDICATOR_DURATION);
           }
-          return await ig.sendVideo(threadID, videoPath, {});
+          return await withDelay(() => ig.sendVideo(threadID, videoPath, {}));
         } catch (error) {
           logger.error('Failed to send video', { error: error.message, threadID });
           throw error;
@@ -547,7 +568,7 @@ class InstagramBot {
             try { ig.sendTypingIndicator(threadID); } catch (_) {}
             await this._sleep(config.TYPING_INDICATOR_DURATION);
           }
-          return await ig.sendVoice(threadID, audioPath, {});
+          return await withDelay(() => ig.sendVoice(threadID, audioPath, {}));
         } catch (error) {
           logger.error('Failed to send audio', { error: error.message, threadID });
           throw error;
@@ -557,8 +578,7 @@ class InstagramBot {
       unsendMessage: async (threadID, messageID) => {
         try {
           await ig.unsendMessage(messageID);
-          const db = require('../utils/database');
-          db.removeSentMessage(threadID, messageID);
+          database.removeSentMessage(threadID, messageID);
         } catch (error) {
           logger.error('Failed to unsend message', { error: error.message, threadID, messageID });
           throw error;
@@ -566,8 +586,7 @@ class InstagramBot {
       },
 
       getLastSentMessage: (threadID) => {
-        const db = require('../utils/database');
-        return db.getLastSentMessage(threadID);
+        return database.getLastSentMessage(threadID);
       },
 
       getUserInfo: async (userID) => {
@@ -590,7 +609,7 @@ class InstagramBot {
 
       sendPhotoFromUrl: async (threadID, url, opts = {}) => {
         try {
-          return await ig.sendPhotoFromUrl(threadID, url, opts);
+          return await withDelay(() => ig.sendPhotoFromUrl(threadID, url, opts));
         } catch (error) {
           logger.error('Failed to send photo from url', { error: error.message, threadID });
           throw error;
@@ -599,7 +618,7 @@ class InstagramBot {
 
       sendVideoFromUrl: async (threadID, url, opts = {}) => {
         try {
-          return await ig.sendVideoFromUrl(threadID, url, opts);
+          return await withDelay(() => ig.sendVideoFromUrl(threadID, url, opts));
         } catch (error) {
           logger.error('Failed to send video from url', { error: error.message, threadID });
           throw error;
@@ -608,7 +627,7 @@ class InstagramBot {
 
       sendVoiceFromUrl: async (threadID, url, opts = {}) => {
         try {
-          return await ig.sendVoiceFromUrl(threadID, url, opts);
+          return await withDelay(() => ig.sendVoiceFromUrl(threadID, url, opts));
         } catch (error) {
           logger.error('Failed to send voice from url', { error: error.message, threadID });
           throw error;
@@ -625,7 +644,7 @@ class InstagramBot {
 
       replyToMessage: async (threadID, text, replyToMessageID) => {
         try {
-          return await ig.replyToMessage(threadID, text, replyToMessageID);
+          return await withDelay(() => ig.replyToMessage(threadID, text, replyToMessageID));
         } catch (error) {
           logger.error('Failed to reply to message', { error: error.message, threadID });
           throw error;
@@ -638,7 +657,6 @@ class InstagramBot {
     if (this._reminderTimer) clearInterval(this._reminderTimer);
     this._reminderTimer = setInterval(async () => {
       try {
-        const database = require('../utils/database');
         const due = database.getDueReminders();
         for (const reminder of due) {
           database.removeReminder(reminder.id);

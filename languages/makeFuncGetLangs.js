@@ -1,18 +1,5 @@
 const fs = require("fs-extra");
-const log = require("../logger/log.js");
 const path = require("path");
-
-let pathLanguageFile = `${__dirname}/${global.GoatBot.config.language}.lang`;
-if (!fs.existsSync(pathLanguageFile)) {
-	log.warn("LANGUAGE", `Can't find language file ${global.GoatBot.config.language}.lang, using default language file "${__dirname}/en.lang"`);
-	pathLanguageFile = `${__dirname}/en.lang`;
-}
-const readLanguage = fs.readFileSync(pathLanguageFile, "utf-8");
-const languageData = readLanguage
-	.split(/\r?\n|\r/)
-	.filter(line => line && !line.trim().startsWith("#") && !line.trim().startsWith("//") && line != "");
-
-global.language = convertLangObj(languageData);
 
 function convertLangObj(languageData) {
 	const obj = {};
@@ -27,11 +14,25 @@ function convertLangObj(languageData) {
 			obj[head] = {};
 		obj[head][key] = value;
 	}
-
 	return obj;
 }
 
 function getText(head, key, ...args) {
+	const log = require("../logger/log.js");
+	const config = global.GoatBot?.config || require('../config');
+
+	if (!global.language) {
+		let pathLanguageFile = path.join(__dirname, `${config.LANGUAGE || 'en'}.lang`);
+		if (!fs.existsSync(pathLanguageFile)) {
+			pathLanguageFile = path.join(__dirname, 'en.lang');
+		}
+		const readLanguage = fs.readFileSync(pathLanguageFile, "utf-8");
+		const languageData = readLanguage
+			.split(/\r?\n|\r/)
+			.filter(line => line && !line.trim().startsWith("#") && !line.trim().startsWith("//") && line != "");
+		global.language = convertLangObj(languageData);
+	}
+
 	let langObj;
 	if (typeof head == "object") {
 		let pathLanguageFile = path.normalize(`${__dirname}/${head.lang}.lang`);
