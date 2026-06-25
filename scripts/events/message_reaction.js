@@ -1,8 +1,8 @@
 'use strict';
 
-const logger = require('../utils/logger');
-const PermissionManager = require('../utils/permissions');
-const database = require('../utils/database');
+const logger = require('../../utils/logger');
+const PermissionManager = require('../../utils/permissions');
+const database = require('../../utils/database');
 
 const ANGER_EMOJIS = ['😠', '😡'];
 

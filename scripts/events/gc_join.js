@@ -1,7 +1,7 @@
 'use strict';
 
-const logger = require('../utils/logger');
-const config = require('../config');
+const logger = require('../../utils/logger');
+const config = require('../../config');
 
 module.exports = {
   config: { name: 'gc_join', description: 'Welcome new members when they join a group chat' },

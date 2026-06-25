@@ -174,8 +174,8 @@ const config = {
   AI_FALLBACK: c.aiFallback || { enable: false, command: 'gpt' },
 
   // Absolute paths
-  COMMANDS_PATH: path.join(ROOT, 'commands'),
-  EVENTS_PATH:   path.join(ROOT, 'events'),
+  COMMANDS_PATH: path.join(ROOT, 'scripts/cmds'),
+  EVENTS_PATH:   path.join(ROOT, 'scripts/events'),
   LOGS_PATH:     LOGS_DIR,
   DATA_PATH:     DATA_DIR,
   TEMP_PATH:     TEMP_DIR,
