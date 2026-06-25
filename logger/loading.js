@@ -1,9 +1,5 @@
 const log = require('./log.js');
 
-/**
- * Backward compatibility bridge for loading logs.
- * Redirects to the new unified logger.
- */
 module.exports = {
     err: (prefix, message) => log.error(prefix, message),
     error: (prefix, message) => log.error(prefix, message),

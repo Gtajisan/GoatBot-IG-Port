@@ -10,21 +10,8 @@
  * @credit DongDev, NTKhang, Team Calyx
  */
 
-process.on('unhandledRejection', (reason, promise) => {
-    if (global.utils?.log) {
-        global.utils.log.error("UNHANDLED_REJECTION", `Reason: ${reason?.message || reason}`, { stack: reason?.stack });
-    } else {
-        console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-    }
-});
-
-process.on('uncaughtException', (error) => {
-    if (global.utils?.log) {
-        global.utils.log.error("UNCAUGHT_EXCEPTION", error.message, { stack: error.stack });
-    } else {
-        console.error('Uncaught Exception:', error);
-    }
-});
+process.on('unhandledRejection', error => console.log(error));
+process.on('uncaughtException', error => console.log(error));
 
 require('dotenv').config();
 
@@ -258,3 +245,8 @@ function displayAdvancedStats(api, threadsData, usersData) {
 
 
 require('./bot/login/loginIG.js');
+
+// Example of how gcCount might be incremented (you'll need to implement actual GC tracking)
+// setInterval(() => {
+//     global.GoatBot.gcCount = (global.GoatBot.gcCount || 0) + 1;
+// }, 60000); // Increment every minute for demonstration
