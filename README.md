@@ -1,6 +1,13 @@
 <div align="center">
 
-<img src="https://user-images.githubusercontent.com/74038190/240906093-9be4d344-6782-461a-b5a6-32a07bf7b34e.gif" width="200" alt="Anime Girl"/>
+<!-- ╔══════════════════════════════════════════════════════╗ -->
+<!--           ANIME HEADER — famous anime girls              -->
+<!-- ╚══════════════════════════════════════════════════════╝ -->
+
+<img src="https://user-images.githubusercontent.com/74038190/213910845-af37a709-8995-40d6-be59-724526e3c3d7.gif" width="140" alt="Anime Girl 1"/>
+<img src="https://user-images.githubusercontent.com/74038190/229223263-cf2e4b07-2615-4f87-9c38-e37600f8381a.gif" width="200" alt="Zero Two — Darling in the FranXX"/>
+<img src="https://user-images.githubusercontent.com/74038190/226127923-0e8b7792-7b3c-462b-951b-63c96ba1a5af.gif" width="200" alt="Anime Girl 3"/>
+<img src="https://user-images.githubusercontent.com/74038190/212749447-bfb7e725-6987-49d9-ae85-2015e3e7cc41.gif" width="140" alt="Anime Coder Girl"/>
 
 <img src="https://capsule-render.vercel.app/api?type=waving&color=0:7c3aed,100:db2777&height=200&section=header&text=GoatBot-IG&fontSize=70&fontColor=ffffff&animation=twinkling&fontAlignY=38&desc=Professional%20Instagram%20Bot%20%7C%20MQTT%20Powered&descAlignY=60&descSize=18" width="100%"/>
 
@@ -150,13 +157,13 @@ account.txt   ← root of the project
 ```
 # Netscape HTTP Cookie File
 # This is the cookie file — paste your Instagram cookies below
-#HttpOnly_.instagram.com	TRUE	/	TRUE	1999999999	ps_n	1
-#HttpOnly_.instagram.com	TRUE	/	TRUE	1999999999	datr	XXXXXXXXXXXXXXXXXXXXXXXX
-.instagram.com	TRUE	/	TRUE	1999999999	ds_user_id	YOUR_USER_ID_HERE
-.instagram.com	TRUE	/	TRUE	1999999999	csrftoken	YOUR_CSRF_TOKEN_HERE
-#HttpOnly_.instagram.com	TRUE	/	TRUE	1999999999	ig_did	XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
-#HttpOnly_.instagram.com	TRUE	/	TRUE	1999999999	sessionid	YOUR_USER_ID%3AYOUR_SESSION_TOKEN
-.instagram.com	TRUE	/	TRUE	1999999999	mid	XXXXXXXXXXXXXXXXXXXXXXXX
+#HttpOnly_.instagram.com        TRUE    /       TRUE    1999999999      ps_n    1
+#HttpOnly_.instagram.com        TRUE    /       TRUE    1999999999      datr    XXXXXXXXXXXXXXXXXXXXXXXX
+.instagram.com  TRUE    /       TRUE    1999999999      ds_user_id      YOUR_USER_ID_HERE
+.instagram.com  TRUE    /       TRUE    1999999999      csrftoken       YOUR_CSRF_TOKEN_HERE
+#HttpOnly_.instagram.com        TRUE    /       TRUE    1999999999      ig_did  XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+#HttpOnly_.instagram.com        TRUE    /       TRUE    1999999999      sessionid       YOUR_USER_ID%3AYOUR_SESSION_TOKEN
+.instagram.com  TRUE    /       TRUE    1999999999      mid     XXXXXXXXXXXXXXXXXXXXXXXX
 ```
 
 > ⚠️ **Important:** Columns are separated by **TAB characters** (`\t`), not spaces.
