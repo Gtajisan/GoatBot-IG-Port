@@ -16,13 +16,13 @@
 
 <br/>
 
-> ✨ *A powerful Instagram Direct Message bot with a live web dashboard — built for speed, style, and extensibility.*
+>  *A powerful Instagram Direct Message bot with a live web dashboard — built for speed, style, and extensibility.*
 
 </div>
 
 ---
 
-## 🌸 Table of Contents
+##  Table of Contents
 
 - [✨ Features](#-features)
 - [📸 Screenshots](#-screenshots)
