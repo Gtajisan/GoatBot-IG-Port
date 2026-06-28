@@ -6,7 +6,17 @@ const config = require('../config');
 class CommandLoader {
   constructor() {
     this.commands = new Map();
+    this.aliases = new Map();
     this.cooldowns = new Map();
+
+    // Bridge for GoatBot V2 global access
+    global.GoatBot = global.GoatBot || {};
+    global.GoatBot.commands = this.commands;
+    global.GoatBot.aliases = this.aliases;
+    global.GoatBot.onReply = new Map();
+    global.GoatBot.onReaction = new Map();
+    global.GoatBot.onEvent = new Map();
+    global.client = global.client || {};
   }
 
   async loadCommands() {
@@ -24,15 +34,39 @@ class CommandLoader {
         delete require.cache[require.resolve(fp)];
         const cmd = require(fp);
         if (!cmd.config || !cmd.config.name) { logger.warn(`Command ${file} missing config.name, skipping`); continue; }
-        this.commands.set(cmd.config.name, cmd);
-        if (cmd.config.aliases) cmd.config.aliases.forEach(a => this.commands.set(a, cmd));
+
+        this.commands.set(cmd.config.name.toLowerCase(), cmd);
+        if (cmd.config.aliases) {
+            cmd.config.aliases.forEach(a => {
+                this.aliases.set(a.toLowerCase(), cmd.config.name.toLowerCase());
+                this.commands.set(a.toLowerCase(), cmd);
+            });
+        }
+
+        // Support onLoad for GoatBot V2 commands
+        if (typeof cmd.onLoad === 'function') {
+            try {
+                cmd.onLoad({
+                    api: global.GoatBot.fcaApi,
+                    bot: global.GoatBot.instance, // Will be set later
+                    database: require('./database'),
+                    usersData: require('./database').usersData,
+                    threadsData: require('./database').threadsData
+                });
+            } catch (e) {
+                logger.error(`Error in onLoad of ${cmd.config.name}`, { error: e.message });
+            }
+        }
+
         logger.info(`Loaded: ${cmd.config.name}`);
       } catch (e) { logger.error(`Failed to load ${file}`, { error: e.message }); }
     }
-    logger.info(`Successfully loaded ${this.commands.size} commands`);
+    logger.info(`Successfully loaded ${this.commands.size} command triggers`);
   }
 
-  getCommand(name) { return this.commands.get(name.toLowerCase()) || null; }
+  getCommand(name) {
+      return this.commands.get(name.toLowerCase()) || null;
+  }
 
   checkCooldown(userId, cmdName, ms) {
     const key = `${userId}-${cmdName}`;
@@ -50,7 +84,7 @@ class CommandLoader {
     setTimeout(() => this.cooldowns.delete(key), ms);
   }
 
-  async reloadCommands() { this.commands.clear(); await this.loadCommands(); }
+  async reloadCommands() { this.commands.clear(); this.aliases.clear(); await this.loadCommands(); }
 
   getAllCommandNames() {
     const s = new Set();

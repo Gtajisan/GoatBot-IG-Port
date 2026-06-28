@@ -39,6 +39,22 @@ class EventLoader {
 
   async handleEvent(name, data) {
     const ev = this.events.get(name);
+
+    // Support for handlerEvents global in GoatV2
+    for (const [eventName, eventCmd] of this.events) {
+        if (typeof eventCmd.onStart === 'function') {
+            eventCmd.onStart({
+                api: this.bot.api,
+                event: data,
+                bot: this.bot,
+                database: require('./database'),
+                usersData: require('./database').usersData,
+                threadsData: require('./database').threadsData,
+                getLang: (...args) => require('../utils.js').getText(eventCmd.config.name, ...args)
+            }).catch(e => logger.error(`Error in event script ${eventName}`, { error: e.message }));
+        }
+    }
+
     if (!ev) { logger.debug(`No handler for event: ${name}`); return; }
     try { await ev.run(this.bot, data); }
     catch (e) { logger.error(`Error handling event ${name}`, { error: e.message, stack: e.stack }); }

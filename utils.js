@@ -259,6 +259,16 @@ function isNumber(value) {
 	return !isNaN(parseFloat(value));
 }
 
+function compareVersion(version1, version2) {
+    const v1 = version1.split(".");
+    const v2 = version2.split(".");
+    for (let i = 0; i < 3; i++) {
+        if (parseInt(v1[i]) > parseInt(v2[i])) return 1;
+        if (parseInt(v1[i]) < parseInt(v2[i])) return -1;
+    }
+    return 0;
+}
+
 function jsonStringifyColor(obj, filter, indent, level) {
 	// source: https://www.npmjs.com/package/node-json-color-stringify
 	indent = indent || 0;
@@ -799,6 +809,7 @@ const utils = {
 	getText: require("./languages/makeFuncGetLangs.js"),
 	getTime,
 	getType,
+    compareVersion,
 	isHexColor,
 	isNumber,
 	jsonStringifyColor,

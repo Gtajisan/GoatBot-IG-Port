@@ -25,6 +25,35 @@ module.exports = {
       user.messageCount = (user.messageCount || 0) + 1;
       database.updateUser(event.senderID, user);
 
+      // onFirstChat support
+      if (!global.client) global.client = {};
+      if (!global.client.onFirstChat) global.client.onFirstChat = new Set();
+      if (!global.client.onFirstChat.has(event.threadId)) {
+          global.client.onFirstChat.add(event.threadId);
+          for (const [name, cmd] of bot.commandLoader.commands) {
+              if (typeof cmd.onFirstChat === 'function') {
+                  cmd.onFirstChat({
+                      api, event, bot, database, usersData: database.usersData, threadsData: database.threadsData
+                  }).catch(e => logger.error(`onFirstChat error in ${name}`, { error: e.message }));
+              }
+          }
+      }
+
+      // onChat support
+      for (const [name, cmd] of bot.commandLoader.commands) {
+          if (typeof cmd.onChat === 'function') {
+              cmd.onChat({
+                  api,
+                  event,
+                  bot,
+                  database,
+                  usersData: database.usersData,
+                  threadsData: database.threadsData,
+                  getLang: (...args) => require('../utils.js').getText(cmd.config.name, ...args)
+              }).catch(e => logger.error(`onChat error in ${name}`, { error: e.message }));
+          }
+      }
+
       const modResult = await moderation.moderateMessage(event.senderID, event.threadId, event.body);
       if (!modResult.allowed) {
         if (modResult.message) await api.sendMessage(modResult.message, event.threadId);
@@ -35,6 +64,24 @@ module.exports = {
 
       const autoResponse = database.findAutoResponse(event.body);
       if (autoResponse) { await api.sendMessage(autoResponse.response, event.threadId); return; }
+
+      // Handle onReply
+      if (event.replyToItemId) {
+          const replyData = database.getReplyData(event.replyToItemId) || global.GoatBot.onReply.get(String(event.replyToItemId));
+          if (replyData && replyData.commandName) {
+              const command = commandLoader.getCommand(replyData.commandName);
+              if (command) {
+                  const replyParams = {
+                      api, event, bot, commandName: replyData.commandName,
+                      logger, database, usersData: database.usersData,
+                      threadsData: database.threadsData,
+                      Reply: replyData, replyData
+                  };
+                  if (typeof command.onReply === 'function') return await command.onReply(replyParams);
+                  if (typeof command.handleReply === 'function') return await command.handleReply(replyParams);
+              }
+          }
+      }
 
       const threadData = database.getThreadData(event.threadId);
       const prefix = threadData?.prefix || config.PREFIX;
@@ -59,6 +106,7 @@ module.exports = {
         if (startsWithPrefix) await api.sendMessage(`ℹ️ Type ${prefix}help to see all commands.`, event.threadId);
         return;
       }
+
 
       const command = commandLoader.getCommand(commandName);
 
@@ -136,7 +184,41 @@ module.exports = {
           }
         });
 
-        await command.run({ api: replyApi, event, args, bot, commandName: command.config.name, logger, database, config, PermissionManager, ConfigManager });
+        const getLang = (...args) => require('../utils.js').getText(command.config.name, ...args);
+        const commandParams = {
+            api: replyApi,
+            event,
+            args,
+            bot,
+            commandName: command.config.name,
+            logger,
+            database,
+            usersData: database.usersData,
+            threadsData: database.threadsData,
+            config,
+            getLang,
+            PermissionManager,
+            ConfigManager,
+            message: {
+                reply: (form, callback) => replyApi.sendMessage(form, event.threadId, callback, event.messageID),
+                send: (form, callback) => replyApi.sendMessage(form, event.threadId, callback),
+                reaction: (emoji, messageID, callback) => replyApi.setMessageReaction(emoji, messageID || event.messageID, callback),
+                unsend: (messageID, callback) => replyApi.unsendMessage(messageID || event.messageID, callback),
+                err: (err) => {
+                    const msg = typeof err === 'object' ? err.message || JSON.stringify(err) : String(err);
+                    return replyApi.sendMessage(`❌ Error: ${msg}`, event.threadId);
+                },
+                SyntaxError: () => {
+                    return replyApi.sendMessage(`❌ Syntax Error!\nUse: ${prefix}help ${command.config.name} for usage instructions.`, event.threadId);
+                }
+            }
+        };
+
+        if (typeof command.onStart === 'function') {
+            await command.onStart(commandParams);
+        } else if (typeof command.run === 'function') {
+            await command.run(commandParams);
+        }
         if (cooldownTime > 0) commandLoader.setCooldown(event.senderID, command.config.name, cooldownTime);
       } catch (e) {
         logger.error(`Command error: ${command.config.name}`, { error: e.message });
