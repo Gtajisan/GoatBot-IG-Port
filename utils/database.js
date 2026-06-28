@@ -2,21 +2,120 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('./logger');
 const config = require('../config');
+const _ = require('lodash');
 
 class Database {
   constructor() {
     this.data = this._default();
     this.dbPath = path.resolve(config.DATABASE_PATH || './storage/data/bot.sqlite');
     this.storeType = 'json';
+
+    // Compatibility properties
+    this.allUserData = [];
+    this.allThreadData = [];
+    this.allGlobalData = [];
+
+    // Wrappers for GoatBot V2 compatibility
+    this.usersData = {
+      get: async (uid, path, defaultValue) => {
+          const u = this.getUser(uid);
+          if (path) return _.get(u, path, defaultValue);
+          return u;
+      },
+      set: async (uid, updates, path) => {
+          const u = this.getUser(uid);
+          if (path) {
+              _.set(u, path, updates);
+              return this.updateUser(uid, u);
+          }
+          return this.updateUser(uid, updates);
+      },
+      getAll: async () => {
+          this.allUserData = Object.values(this.data.users);
+          return this.allUserData;
+      },
+      getAvatarUrl: async (uid) => {
+          return `https://www.instagram.com/p/avatar/${uid}`;
+      },
+      getName: async (uid) => {
+          const u = this.getUser(uid);
+          return u.name || uid;
+      },
+      getNameInDB: (uid) => {
+          const u = this.data.users[uid];
+          return u ? u.name : null;
+      },
+      getMoney: async (uid) => {
+          const e = this.getBalance(uid);
+          return e.balance;
+      },
+      addMoney: async (uid, amt) => {
+          return this.addBalance(uid, amt);
+      },
+      subtractMoney: async (uid, amt) => {
+          return this.addBalance(uid, -amt);
+      }
+    };
+
+    this.threadsData = {
+      getName: async (tid) => {
+          const t = this.getThreadData(tid);
+          return t.name || tid;
+      },
+      get: async (tid, path, defaultValue) => {
+          const t = this.getThreadData(tid);
+          if (path) return _.get(t, path, defaultValue);
+          return t;
+      },
+      set: async (tid, updates, path) => {
+          const t = this.getThreadData(tid);
+          if (path) {
+              _.set(t, path, updates);
+              return this.setThreadData(tid, t);
+          }
+          return this.setThreadData(tid, updates);
+      },
+      getAll: async () => {
+          this.allThreadData = Object.values(this.data.threads);
+          return this.allThreadData;
+      }
+    };
+
+    // Bridge for GoatBot V2
+    if (!global.client) global.client = {};
+    if (!global.client.database) global.client.database = {};
+    global.client.database.usersData = this.usersData;
+    global.client.database.threadsData = this.threadsData;
+    global.client.database.globalData = this.globalData;
+
+    // Bridge for global data
+    this.globalData = {
+        get: async (key, path, defaultValue) => {
+            if (!this.data.global) this.data.global = {};
+            if (!this.data.global[key]) this.data.global[key] = defaultValue || { data: {} };
+            const res = this.data.global[key];
+            if (path) return _.get(res, path, defaultValue);
+            return res;
+        },
+        set: async (key, val, path) => {
+            if (!this.data.global) this.data.global = {};
+            if (!this.data.global[key]) this.data.global[key] = { data: {} };
+            if (path) _.set(this.data.global[key], path, val);
+            else this.data.global[key] = val;
+            return this.data.global[key];
+        }
+    };
+
     this.ready = this.init();
   }
 
   _default() {
     return {
-      users: {}, threads: {}, stats: {}, economy: {},
+      users: {}, threads: {}, stats: {}, economy: {}, global: {},
       reminders: [], autoResponses: [],
       welcomedUsers: new Set(), bannedUsers: new Set(),
-      spamWarnings: {}, lastMessages: {}, sentMessages: {}, processedMessages: {}
+      spamWarnings: {}, lastMessages: {}, sentMessages: {}, processedMessages: {},
+      replyHandlers: {}, reactionHandlers: {}
     };
   }
 
@@ -24,14 +123,20 @@ class Database {
     return {
       users: d.users || {}, threads: d.threads || {}, stats: d.stats || {},
       economy: d.economy || {}, reminders: d.reminders || [], autoResponses: d.autoResponses || [],
+      global: d.global || {},
       welcomedUsers: new Set(d.welcomedUsers || []), bannedUsers: new Set(d.bannedUsers || []),
       spamWarnings: d.spamWarnings || {}, lastMessages: d.lastMessages || {},
-      sentMessages: d.sentMessages || {}, processedMessages: d.processedMessages || {}
+      sentMessages: d.sentMessages || {}, processedMessages: d.processedMessages || {},
+      replyHandlers: d.replyHandlers || {}, reactionHandlers: d.reactionHandlers || {}
     };
   }
 
   _serialize() {
-    return { ...this.data, welcomedUsers: [...this.data.welcomedUsers], bannedUsers: [...this.data.bannedUsers] };
+    return {
+        ...this.data,
+        welcomedUsers: [...this.data.welcomedUsers],
+        bannedUsers: [...this.data.bannedUsers]
+    };
   }
 
   _ensureDir() {
@@ -50,6 +155,11 @@ class Database {
         this.save();
         logger.info('Created new database');
       }
+
+      this.allUserData = Object.values(this.data.users);
+      this.allThreadData = Object.values(this.data.threads);
+      this.allGlobalData = Object.values(this.data.global || {});
+
       if (config.DATABASE_AUTO_SAVE) {
         setInterval(() => this.save(), config.DATABASE_SAVE_INTERVAL || 60000);
         logger.info('Auto-save enabled');
@@ -70,7 +180,21 @@ class Database {
   }
 
   getUser(uid) {
-    if (!this.data.users[uid]) this.data.users[uid] = { id: uid, firstSeen: Date.now(), lastSeen: Date.now(), messageCount: 0, commandCount: 0 };
+    if (!this.data.users[uid]) {
+      this.data.users[uid] = {
+        id: uid,
+        userID: uid,
+        firstSeen: Date.now(),
+        lastSeen: Date.now(),
+        messageCount: 0,
+        commandCount: 0,
+        exp: 0,
+        level: 1,
+        money: 0,
+        banned: false,
+        data: {}
+      };
+    }
     return this.data.users[uid];
   }
 
@@ -82,11 +206,23 @@ class Database {
   }
 
   getBalance(uid) {
-    if (!this.data.economy[uid]) this.data.economy[uid] = { balance: 1000, bank: 0, lastDaily: 0, lastWork: 0 };
+    if (!this.data.economy[uid]) {
+      this.data.economy[uid] = { balance: 1000, bank: 0, lastDaily: 0, lastWork: 0 };
+    }
+    const u = this.getUser(uid);
+    if (u.money !== undefined && u.money !== this.data.economy[uid].balance) {
+        this.data.economy[uid].balance = u.money;
+    }
     return this.data.economy[uid];
   }
 
-  addBalance(uid, amt) { const e = this.getBalance(uid); e.balance += amt; this.data.economy[uid] = e; return e.balance; }
+  addBalance(uid, amt) {
+    const e = this.getBalance(uid);
+    e.balance += amt;
+    this.data.economy[uid] = e;
+    this.updateUser(uid, { money: e.balance });
+    return e.balance;
+  }
 
   incrementStat(key) { this.data.stats[key] = (this.data.stats[key] || 0) + 1; }
   getStat(key)       { return this.data.stats[key] || 0; }
@@ -99,7 +235,16 @@ class Database {
   unbanUser(uid){ this.data.bannedUsers.delete(String(uid)); logger.info(`User ${uid} unbanned`); }
 
   getThreadData(tid) {
-    if (!this.data.threads[tid]) this.data.threads[tid] = { id: tid, prefix: null, settings: {}, createdAt: Date.now() };
+    if (!this.data.threads[tid]) {
+      this.data.threads[tid] = {
+        id: tid,
+        threadID: tid,
+        prefix: null,
+        settings: {},
+        data: {},
+        createdAt: Date.now()
+      };
+    }
     return this.data.threads[tid];
   }
 
@@ -197,6 +342,26 @@ class Database {
     this.data.spamWarnings[uid].count++;
     this.data.spamWarnings[uid].lastWarning = Date.now();
     return this.data.spamWarnings[uid].count;
+  }
+
+  setReplyData(messageID, data) {
+    this.data.replyHandlers[String(messageID)] = { ...data, timestamp: Date.now() };
+    if (!global.GoatBot.onReply) global.GoatBot.onReply = new Map();
+    global.GoatBot.onReply.set(String(messageID), data);
+  }
+
+  getReplyData(messageID) {
+    return this.data.replyHandlers[String(messageID)] || null;
+  }
+
+  setReactionData(messageID, data) {
+    this.data.reactionHandlers[String(messageID)] = { ...data, timestamp: Date.now() };
+    if (!global.GoatBot.onReaction) global.GoatBot.onReaction = new Map();
+    global.GoatBot.onReaction.set(String(messageID), data);
+  }
+
+  getReactionData(messageID) {
+    return this.data.reactionHandlers[String(messageID)] || null;
   }
 }
 

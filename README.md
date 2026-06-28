@@ -72,6 +72,9 @@
 | 📜 **Robust Logging** | Winston-powered daily rotation and webhook support |
 | 🕵️ **Anti-Ban** | Human-like delays and typing indicators |
 | 🤖 **AI Fallback** | Automatically routes unknown commands to AI |
+| 🐐 **GoatV2 Core** | Fully ported core system and lifecycle support |
+| 💳 **Advanced Bank** | Complete banking system with ATM cards |
+| 📈 **Rank System** | Experience and level system with rank cards |
 
 </div>
 

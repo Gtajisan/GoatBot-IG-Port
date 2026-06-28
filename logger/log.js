@@ -39,6 +39,7 @@ module.exports = {
     error: (...args) => formatAndLog('error', args),
     warn: (...args) => formatAndLog('warn', args),
     info: (...args) => formatAndLog('info', args),
+    succes: (...args) => formatAndLog('success', args),
     success: (...args) => formatAndLog('success', args),
     debug: (...args) => formatAndLog('debug', args),
     master: (...args) => formatAndLog('info', ['MASTER', ...args]),

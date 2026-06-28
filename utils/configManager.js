@@ -64,6 +64,10 @@ class ConfigManager {
     cfg[key] = value;
     return this.saveConfig(cfg);
   }
+
+  static get config() {
+      return this.loadConfig();
+  }
 }
 
 module.exports = ConfigManager;

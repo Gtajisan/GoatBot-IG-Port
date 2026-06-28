@@ -201,6 +201,19 @@ class InstagramBot {
 
       const database = require('../utils/database');
       await database.ready;
+      global.db = database;
+      global.utils = require('../utils.js');
+      global.GoatBot = global.GoatBot || {};
+      global.GoatBot.config = config;
+      global.GoatBot.instance = this;
+      global.client = global.client || {};
+      global.client.database = {
+          usersData: database.usersData,
+          threadsData: database.threadsData,
+          globalData: database.globalData
+      };
+      const path = require('path');
+      global.client.dirConfig = path.resolve(__dirname, '../config/default.json');
 
       await this.commandLoader.loadCommands();
       await this.eventLoader.loadEvents();
@@ -273,6 +286,44 @@ class InstagramBot {
 
     this.username          = this.userID !== 'unknown' ? this.userID : 'unknown';
     this.api               = this.createAPIWrapper();
+    global.GoatBot.fcaApi  = this.api;
+    global.GoatBot.instance = this;
+    global.GoatBot.fcaApi = this.api;
+
+    // Call onLoad for commands now that API is ready
+    const database = require('../utils/database');
+    for (const [name, cmd] of this.commandLoader.commands) {
+        if (typeof cmd.onLoad === 'function') {
+            try {
+                cmd.onLoad({
+                    api: this.api,
+                    bot: this,
+                    database,
+                    usersData: database.usersData,
+                    threadsData: database.threadsData
+                });
+            } catch (e) {
+                logger.error(`Error in onLoad of ${name}`, { error: e.message });
+            }
+        }
+    }
+
+    // custom.js support
+    try {
+        const custom = require('./custom.js');
+        custom({
+            api: this.api,
+            bot: this,
+            database,
+            usersData: database.usersData,
+            threadsData: database.threadsData,
+            globalData: database.globalData,
+            getText: (head, key, ...args) => require('../utils.js').getText(head, key, ...args)
+        }).catch(e => logger.error('Error in custom.js', { error: e.message }));
+    } catch (e) {
+        logger.error('Failed to load custom.js', { error: e.message });
+    }
+
     this.reconnectAttempts = 0;
     this.isRunning         = true;
     logger.info('Connected to Instagram', { userID: this.userID });
@@ -376,6 +427,21 @@ class InstagramBot {
       };
 
       await this.eventLoader.handleEvent('message', normalizedEvent);
+
+      // Global onChat for GoatBot V2 commands
+      for (const [name, cmd] of this.commandLoader.commands) {
+        if (typeof cmd.onChat === 'function') {
+          cmd.onChat({
+            api: this.api,
+            event: normalizedEvent,
+            bot: this,
+            database: require('../utils/database'),
+            usersData: require('../utils/database').usersData,
+            threadsData: require('../utils/database').threadsData,
+            getLang: (...args) => require('../utils.js').getText(cmd.config.name, ...args)
+          }).catch(error => logger.error(`onChat error in ${name}`, { error: error.message }));
+        }
+      }
     } catch (error) {
       logger.error('Error in handleMessage', { error: error.message, stack: error.stack });
     }
@@ -385,6 +451,21 @@ class InstagramBot {
     try {
       const threadID = event.threadID;
       const logType  = event.logMessageType || '';
+      const database = require('../utils/database');
+
+      // Global onEvent for GoatBot V2 commands
+      for (const [name, cmd] of this.commandLoader.commands) {
+          if (typeof cmd.onEvent === 'function') {
+              cmd.onEvent({
+                  api: this.api,
+                  event,
+                  bot: this,
+                  database,
+                  usersData: database.usersData,
+                  threadsData: database.threadsData
+              }).catch(e => logger.error(`onEvent error in ${name}`, { error: e.message }));
+          }
+      }
 
       if (logType === 'log:subscribe') {
         const added = event.logMessageData?.addedParticipants || [];
@@ -462,11 +543,20 @@ class InstagramBot {
 
   createAPIWrapper() {
     const ig = this.ig;
-    const utils = require('../utils');
+    const utils = require('../utils.js');
 
     return {
-      sendMessage: async (text, threadID) => {
+      sendMessage: async (form, threadID, callback, messageID) => {
         try {
+          if (typeof threadID === 'function') {
+              callback = threadID;
+              threadID = null;
+          }
+          if (!threadID) threadID = form.threadID || form.threadId;
+
+          let text = typeof form === 'object' ? form.body || '' : String(form);
+          let attachment = typeof form === 'object' ? form.attachment : null;
+
           // Human-like delay
           await utils.humanDelay();
 
@@ -474,14 +564,36 @@ class InstagramBot {
             try { ig.sendTypingIndicator(threadID); } catch (_) {}
             await this._sleep(config.TYPING_INDICATOR_DURATION);
           }
-          const result = await ig.sendMessage(text, threadID);
+
+          let result;
+          if (attachment) {
+              if (Array.isArray(attachment)) attachment = attachment[0];
+              // Support for different attachment types if we have path or stream
+              if (typeof attachment === 'string' || (attachment && attachment.path)) {
+                  const path = attachment.path || attachment;
+                  if (path.endsWith('.mp4') || path.endsWith('.mov')) result = await ig.sendVideo(threadID, path, { caption: text });
+                  else if (path.endsWith('.mp3') || path.endsWith('.wav') || path.endsWith('.m4a')) result = await ig.sendVoice(threadID, path);
+                  else result = await ig.sendPhoto(threadID, path, { caption: text });
+              } else if (attachment && attachment.readable) {
+                  // If it's a stream, we might need to save it or the API might handle it
+                  // For now, assume URL-like or we convert to temp file if needed
+                  result = await ig.sendMessage(text, threadID);
+              } else {
+                  result = await ig.sendMessage(text, threadID);
+              }
+          } else {
+              result = await ig.sendMessage(text, threadID);
+          }
+
           if (result?.messageID) {
             const db = require('../utils/database');
             db.storeSentMessage(threadID, result.messageID);
           }
+          if (typeof callback === 'function') callback(null, result);
           return result;
         } catch (error) {
           logger.error('Failed to send message', { error: error.message, threadID });
+          if (typeof callback === 'function') callback(error);
           throw error;
         }
       },
@@ -495,11 +607,26 @@ class InstagramBot {
         }
       },
 
-      getThread: async (threadID) => {
+      getThread: async (threadID, callback) => {
         try {
-          return await ig.getThreadInfo(threadID);
+          const info = await ig.getThreadInfo(threadID);
+          if (typeof callback === 'function') callback(null, info);
+          return info;
         } catch (error) {
           logger.error('Failed to get thread', { error: error.message, threadID });
+          if (typeof callback === 'function') callback(error);
+          throw error;
+        }
+      },
+
+      getThreadInfo: async (threadID, callback) => {
+        try {
+          const info = await ig.getThreadInfo(threadID);
+          if (typeof callback === 'function') callback(null, info);
+          return info;
+        } catch (error) {
+          logger.error('Failed to get thread', { error: error.message, threadID });
+          if (typeof callback === 'function') callback(error);
           throw error;
         }
       },
@@ -563,13 +690,14 @@ class InstagramBot {
         }
       },
 
-      unsendMessage: async (threadID, messageID) => {
+      unsendMessage: async (messageID, callback) => {
         try {
-          await ig.unsendMessage(messageID);
-          const db = require('../utils/database');
-          db.removeSentMessage(threadID, messageID);
+          const res = await ig.unsendMessage(messageID);
+          if (typeof callback === 'function') callback(null, res);
+          return res;
         } catch (error) {
-          logger.error('Failed to unsend message', { error: error.message, threadID, messageID });
+          logger.error('Failed to unsend message', { error: error.message, messageID });
+          if (typeof callback === 'function') callback(error);
           throw error;
         }
       },
@@ -581,7 +709,8 @@ class InstagramBot {
 
       getUserInfo: async (userID) => {
         try {
-          return await ig.getUserInfo(userID);
+          const info = await ig.getUserInfo(userID);
+          return { [userID]: info };
         } catch (error) {
           logger.error('Failed to get user info', { error: error.message, userID });
           throw error;
@@ -644,6 +773,117 @@ class InstagramBot {
           logger.error('Failed to reply to message', { error: error.message, threadID });
           throw error;
         }
+      },
+
+      setMessageReaction: async (reaction, messageID, callback, force) => {
+          try {
+              const res = await ig.sendReaction(reaction, messageID);
+              if (typeof callback === 'function') callback(null, res);
+              return res;
+          } catch (e) {
+              logger.error('Failed to set reaction', { error: e.message });
+              if (typeof callback === 'function') callback(e);
+          }
+      },
+
+      changeNickname: async (nickname, threadID, userID) => {
+          logger.warn('changeNickname is not fully supported by underlying API');
+          return true;
+      },
+
+      resolvePhotoUrl: async (photoID) => {
+          // Mock for rank card etc.
+          return photoID;
+      },
+
+      getThreadList: async (limit, timestamp, tags) => {
+          try {
+              // Map tags to folder if needed, e.g. ['PENDING'] -> 'pending'
+              let folder = 'inbox';
+              if (tags && tags.includes('PENDING')) folder = 'pending';
+              if (tags && tags.includes('OTHER')) folder = 'other';
+
+              const result = await ig.getThreadList(limit, folder);
+              // Normalize result to array if it's an object with threads
+              return result?.threads || result?.items || result || [];
+          } catch (error) {
+              logger.error('Failed to get thread list', { error: error.message });
+              throw error;
+          }
+      },
+
+      getCurrentUserID: () => this.userID,
+
+      deleteMessage: async (threadID, messageID) => {
+          return await ig.unsendMessage(messageID);
+      },
+
+      addUserToGroup: async (userID, threadID) => {
+          try {
+              if (typeof ig.addUserToGroup === 'function') return await ig.addUserToGroup(userID, threadID);
+              if (typeof ig.addParticipant === 'function') return await ig.addParticipant(threadID, userID);
+              logger.warn('addUserToGroup not supported by API');
+          } catch (e) {
+              logger.error('addUserToGroup error', { error: e.message });
+              throw e;
+          }
+      },
+
+      removeUserFromGroup: async (userID, threadID) => {
+          try {
+              if (typeof ig.removeUserFromGroup === 'function') return await ig.removeUserFromGroup(userID, threadID);
+              if (typeof ig.removeParticipant === 'function') return await ig.removeParticipant(threadID, userID);
+              logger.warn('removeUserFromGroup not supported by API');
+          } catch (e) {
+              logger.error('removeUserFromGroup error', { error: e.message });
+              throw e;
+          }
+      },
+
+      setTitle: async (title, threadID) => {
+          try {
+              if (typeof ig.setThreadTitle === 'function') return await ig.setThreadTitle(threadID, title);
+              logger.warn('setTitle not supported by API');
+          } catch (e) {
+              logger.error('setTitle error', { error: e.message });
+          }
+      },
+
+      changeAdminStatus: async (threadID, userID, isAdmin) => {
+          logger.warn('changeAdminStatus not fully supported');
+          return true;
+      },
+
+      getThreadHistory: async (threadID, limit) => {
+          try {
+              return await ig.getThreadHistory(threadID, limit);
+          } catch (e) {
+              return [];
+          }
+      },
+
+      shareContact: async (text, senderID, threadID) => {
+          return await ig.sendMessage(text, threadID);
+      },
+
+      getAvatarUrl: async (userID) => {
+          return `https://www.instagram.com/p/avatar/${userID}`;
+      },
+
+      sendTypingIndicator: async (threadID) => {
+          try {
+              return await ig.sendTypingIndicator(threadID);
+          } catch (e) {
+              return false;
+          }
+      },
+
+      markAsRead: async (threadID) => {
+          try {
+              return await ig.markAsRead(threadID);
+          } catch (e) {
+              return false;
+          }
       }
     };
   }
