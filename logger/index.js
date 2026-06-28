@@ -13,11 +13,14 @@ if (!fs.existsSync(logDir)) {
 
 let config = {};
 try {
-    const configPath = path.join(process.cwd(), 'config_goatbot_v2.json');
+    // Correcting config path to use the bot's default config or the one in config/
+    const configPath = path.join(process.cwd(), 'config', 'default.json');
     if (fs.existsSync(configPath)) {
         config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     }
-} catch (e) {}
+} catch (e) {
+    console.error('Logger: Failed to load config, using defaults.');
+}
 
 const logLevel = config.logging?.logLevel || 'info';
 const logToFile = config.logging?.logToFile !== false;
@@ -42,13 +45,19 @@ const levelColors = {
 const consoleFormat = winston.format.combine(
     winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
     winston.format.printf(({ timestamp, level, message, tag, ...meta }) => {
-        const levelColor = levelColors[level];
-        const boldColorizer = (colors.bold && colors.bold[levelColor]) ? colors.bold[levelColor] : (text => text);
-        const tagStr = tag ? boldColorizer(`[${tag}]`) : '';
-        const levelStr = boldColorizer(level.toUpperCase().padEnd(7));
+        const levelColor = levelColors[level] || 'white';
+        // colors.bold[levelColor] might not exist, use a safe way
+        const colorFn = colors[levelColor] || (text => text);
+        const tagStr = tag ? `[${tag}]` : '';
+        const levelStr = level.toUpperCase().padEnd(7);
+
+        const coloredLevel = colorFn(levelStr);
+        const coloredTag = tag ? colors.magenta ? colors.magenta(tagStr) : tagStr : '';
+
         const metaEntries = Object.entries(meta).filter(([key]) => !['timestamp', 'level', 'tag'].includes(key));
-        const metaStr = metaEntries.length ? `\n${colors.gray(JSON.stringify(Object.fromEntries(metaEntries), null, 2))}` : '';
-        return `${colors.gray(timestamp)} ${levelStr} ${tagStr} ${message}${metaStr}`;
+        const metaStr = metaEntries.length ? `\n${colors.gray ? colors.gray(JSON.stringify(Object.fromEntries(metaEntries), null, 2)) : JSON.stringify(Object.fromEntries(metaEntries), null, 2)}` : '';
+
+        return `${colors.gray ? colors.gray(timestamp) : timestamp} ${coloredLevel} ${coloredTag} ${message}${metaStr}`;
     })
 );
 
@@ -64,7 +73,9 @@ class WebhookTransport extends winston.Transport {
     }
     log(info, callback) {
         if (this.url) {
-            axios.post(this.url, { content: `**[${info.level.toUpperCase()}]** ${info.tag ? `[${info.tag}] ` : ''}${info.message}` }).catch(() => {});
+            axios.post(this.url, {
+                content: `**[${info.level.toUpperCase()}]** ${info.tag ? `[${info.tag}] ` : ''}${info.message}`
+            }).catch(() => {});
         }
         callback();
     }

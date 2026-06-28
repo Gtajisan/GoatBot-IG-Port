@@ -120,6 +120,19 @@
     "enable": true,
     "duration": 500
   },
+  "humanDelay": {
+    "min": 500,
+    "max": 2000
+  },
+  "logging": {
+    "logLevel": "info",
+    "logToFile": true,
+    "webhookUrl": ""
+  },
+  "AI_FALLBACK": {
+    "enable": false,
+    "command": "gpt"
+  },
   "optionsFca": {
     "online": true,
     "selfListen": true,

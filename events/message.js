@@ -64,6 +64,16 @@ module.exports = {
 
       if (!command) {
         if (startsWithPrefix && !config.HIDE_NOTI.commandNotFound) {
+          // AI Fallback logic
+          if (config.AI_FALLBACK?.enable) {
+            const aiCommandName = config.AI_FALLBACK.command || 'gpt';
+            const aiCommand = commandLoader.getCommand(aiCommandName);
+            if (aiCommand) {
+              const aiArgs = [commandName, ...args];
+              return await aiCommand.run({ api, event, args: aiArgs, bot, commandName: aiCommandName, logger, database, config, PermissionManager, ConfigManager });
+            }
+          }
+
           const allNames = commandLoader.getAllCommandNames();
           const closest  = this.findClosestCommand(commandName, allNames);
           let msg = `❌ Unknown command: "${commandName}"\n\n`;
