@@ -69,6 +69,9 @@
 | 🤖 **AI Command** | Built-in GPT-powered chat via free API |
 | ⏰ **Reminders** | Set time-based reminders — checked every 30 seconds |
 | 🛡️ **Spam Protection** | Auto-bans spammers, configurable thresholds |
+| 📜 **Robust Logging** | Winston-powered daily rotation and webhook support |
+| 🕵️ **Anti-Ban** | Human-like delays and typing indicators |
+| 🤖 **AI Fallback** | Automatically routes unknown commands to AI |
 
 </div>
 

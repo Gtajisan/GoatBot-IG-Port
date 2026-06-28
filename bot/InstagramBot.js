@@ -159,7 +159,9 @@ class InstagramBot {
 
       // GET /api/logs
       if (route === '/logs') {
-        const logFile = path.join(__dirname, '..', 'storage', 'logs', 'combined.log');
+        const moment = require('moment-timezone');
+        const today = moment().tz(config.TIMEZONE || 'UTC').format('YYYY-MM-DD');
+        const logFile = path.join(process.cwd(), 'logs', `combined-${today}.log`);
         try {
           let raw = '';
           if (fs2.existsSync(logFile)) raw = fs2.readFileSync(logFile, 'utf-8');
@@ -460,10 +462,14 @@ class InstagramBot {
 
   createAPIWrapper() {
     const ig = this.ig;
+    const utils = require('../utils');
 
     return {
       sendMessage: async (text, threadID) => {
         try {
+          // Human-like delay
+          await utils.humanDelay();
+
           if (config.TYPING_INDICATOR) {
             try { ig.sendTypingIndicator(threadID); } catch (_) {}
             await this._sleep(config.TYPING_INDICATOR_DURATION);
@@ -517,6 +523,7 @@ class InstagramBot {
 
       sendPhoto: async (photoPath, threadID) => {
         try {
+          await utils.humanDelay();
           if (config.TYPING_INDICATOR) {
             try { ig.sendTypingIndicator(threadID); } catch (_) {}
             await this._sleep(config.TYPING_INDICATOR_DURATION);
@@ -530,6 +537,7 @@ class InstagramBot {
 
       sendVideo: async (videoPath, threadID) => {
         try {
+          await utils.humanDelay();
           if (config.TYPING_INDICATOR) {
             try { ig.sendTypingIndicator(threadID); } catch (_) {}
             await this._sleep(config.TYPING_INDICATOR_DURATION);
@@ -543,6 +551,7 @@ class InstagramBot {
 
       sendAudio: async (audioPath, threadID) => {
         try {
+          await utils.humanDelay();
           if (config.TYPING_INDICATOR) {
             try { ig.sendTypingIndicator(threadID); } catch (_) {}
             await this._sleep(config.TYPING_INDICATOR_DURATION);
@@ -625,6 +634,11 @@ class InstagramBot {
 
       replyToMessage: async (threadID, text, replyToMessageID) => {
         try {
+          await utils.humanDelay();
+          if (config.TYPING_INDICATOR) {
+            try { ig.sendTypingIndicator(threadID); } catch (_) {}
+            await this._sleep(config.TYPING_INDICATOR_DURATION);
+          }
           return await ig.replyToMessage(threadID, text, replyToMessageID);
         } catch (error) {
           logger.error('Failed to reply to message', { error: error.message, threadID });

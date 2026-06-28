@@ -1,18 +1,5 @@
 const fs = require("fs-extra");
-const log = require("../logger/log.js");
 const path = require("path");
-
-let pathLanguageFile = `${__dirname}/${global.GoatBot.config.language}.lang`;
-if (!fs.existsSync(pathLanguageFile)) {
-	log.warn("LANGUAGE", `Can't find language file ${global.GoatBot.config.language}.lang, using default language file "${__dirname}/en.lang"`);
-	pathLanguageFile = `${__dirname}/en.lang`;
-}
-const readLanguage = fs.readFileSync(pathLanguageFile, "utf-8");
-const languageData = readLanguage
-	.split(/\r?\n|\r/)
-	.filter(line => line && !line.trim().startsWith("#") && !line.trim().startsWith("//") && line != "");
-
-global.language = convertLangObj(languageData);
 
 function convertLangObj(languageData) {
 	const obj = {};
@@ -32,6 +19,9 @@ function convertLangObj(languageData) {
 }
 
 function getText(head, key, ...args) {
+    const log = require("../logger/log.js");
+    const config = require("../config");
+
 	let langObj;
 	if (typeof head == "object") {
 		let pathLanguageFile = path.normalize(`${__dirname}/${head.lang}.lang`);
@@ -47,8 +37,25 @@ function getText(head, key, ...args) {
 		langObj = convertLangObj(languageData);
 	}
 	else {
+        if (!global.language) {
+            let pathLanguageFile = `${__dirname}/${config.LANGUAGE || 'en'}.lang`;
+            if (!fs.existsSync(pathLanguageFile)) {
+                pathLanguageFile = `${__dirname}/en.lang`;
+            }
+            if (fs.existsSync(pathLanguageFile)) {
+                const readLanguage = fs.readFileSync(pathLanguageFile, "utf-8");
+                const languageData = readLanguage
+                    .split(/\r?\n|\r/)
+                    .filter(line => line && !line.trim().startsWith("#") && !line.trim().startsWith("//") && line != "");
+
+                global.language = convertLangObj(languageData);
+            } else {
+                global.language = {};
+            }
+        }
 		langObj = global.language;
 	}
+
 	if (!langObj[head]?.hasOwnProperty(key))
 		return `Can't find text: "${head}.${key}"`;
 	let text = langObj[head][key];
