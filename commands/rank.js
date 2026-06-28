@@ -73,17 +73,7 @@ module.exports = {
       ctx.closePath();
 
       const stream = canvas.createPNGStream();
-      // Since our API doesn't support stream directly in some methods, we use a temp file
-      const tempPath = path.join(process.cwd(), 'temp', `rank_${targetID}.png`);
-      const fs = require('fs-extra');
-      await fs.ensureDir(path.dirname(tempPath));
-      const out = fs.createWriteStream(tempPath);
-      stream.pipe(out);
-
-      await new Promise((resolve) => out.on('finish', resolve));
-
-      await api.sendPhoto(tempPath, event.threadId);
-      fs.unlink(tempPath).catch(() => {});
+      await message.reply({ attachment: stream });
 
     } catch (e) {
       console.error(e);

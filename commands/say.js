@@ -33,7 +33,7 @@ module.exports = {
 
     try {
       const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${lang}&client=tw-ob&q=${encodeURIComponent(text.slice(0, 200))}`;
-      await api.sendVoiceFromUrl(event.threadId, url);
+      await message.reply({ attachment: url });
     } catch (err) {
       console.error(err);
       message.reply("An error occurred during TTS conversion.");

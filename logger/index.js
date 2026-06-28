@@ -46,15 +46,14 @@ const consoleFormat = winston.format.combine(
     winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
     winston.format.printf(({ timestamp, level, message, tag, ...meta }) => {
         const levelColor = levelColors[level] || 'white';
-        // colors.bold[levelColor] might not exist, use a safe way
         const colorFn = colors[levelColor] || (text => text);
         const tagStr = tag ? `[${tag}]` : '';
         const levelStr = level.toUpperCase().padEnd(7);
 
         const coloredLevel = colorFn(levelStr);
-        const coloredTag = tag ? colors.magenta ? colors.magenta(tagStr) : tagStr : '';
+        const coloredTag = tag ? (colors.magenta ? colors.magenta(tagStr) : tagStr) : '';
 
-        const metaEntries = Object.entries(meta).filter(([key]) => !['timestamp', 'level', 'tag'].includes(key));
+        const metaEntries = Object.entries(meta).filter(([key]) => !['timestamp', 'level', 'tag', 'splat'].includes(key));
         const metaStr = metaEntries.length ? `\n${colors.gray ? colors.gray(JSON.stringify(Object.fromEntries(metaEntries), null, 2)) : JSON.stringify(Object.fromEntries(metaEntries), null, 2)}` : '';
 
         return `${colors.gray ? colors.gray(timestamp) : timestamp} ${coloredLevel} ${coloredTag} ${message}${metaStr}`;
