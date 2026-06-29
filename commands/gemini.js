@@ -4,7 +4,7 @@ module.exports = {
   config: {
     name: "gemini",
     aliases: ["gmn"],
-    version: "1.2",
+    version: "1.3",
     author: "Ajmaul",
     description: "Gemini AI with image & text support",
     category: "ai",
@@ -28,8 +28,9 @@ module.exports = {
 
     let payloadUrl = "";
     if (imageUrl) {
-      const query = args.join(" ") || "Analyze this image";
-      payloadUrl = `https://kaiz-apis.gleeze.com/api/gemini-pro?ask=${encodeURIComponent(query)}&imageUrl=${encodeURIComponent(imageUrl)}&uid=${uid}&apikey=${apikey}`;
+      // Per the source: https://github.com/mdajmaul/goatbot_ajmaul_83/blob/main/scripts/cmds/Gemini.js
+      // The image URL is sent in the 'ask' parameter.
+      payloadUrl = `https://kaiz-apis.gleeze.com/api/gemini-pro?ask=${encodeURIComponent(imageUrl)}&uid=${uid}&apikey=${apikey}`;
     } else {
       if (args.length === 0) {
         return message.reply("❌ Please provide a question or reply to an image with a question.");
