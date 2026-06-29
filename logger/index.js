@@ -13,13 +13,12 @@ if (!fs.existsSync(logDir)) {
 
 let config = {};
 try {
-    // Correcting config path to use the bot's default config or the one in config/
     const configPath = path.join(process.cwd(), 'config', 'default.json');
     if (fs.existsSync(configPath)) {
         config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     }
 } catch (e) {
-    console.error('Logger: Failed to load config, using defaults.');
+    // Fallback if config can't be loaded
 }
 
 const logLevel = config.logging?.logLevel || 'info';
@@ -52,11 +51,17 @@ const consoleFormat = winston.format.combine(
 
         const coloredLevel = colorFn(levelStr);
         const coloredTag = tag ? (colors.magenta ? colors.magenta(tagStr) : tagStr) : '';
+        const coloredTimestamp = colors.gray ? colors.gray(timestamp) : timestamp;
 
+        // Filter out internal winston properties
         const metaEntries = Object.entries(meta).filter(([key]) => !['timestamp', 'level', 'tag', 'splat'].includes(key));
-        const metaStr = metaEntries.length ? `\n${colors.gray ? colors.gray(JSON.stringify(Object.fromEntries(metaEntries), null, 2)) : JSON.stringify(Object.fromEntries(metaEntries), null, 2)}` : '';
+        let metaStr = '';
+        if (metaEntries.length > 0) {
+            const metaObj = Object.fromEntries(metaEntries);
+            metaStr = `\n${colors.gray ? colors.gray(JSON.stringify(metaObj, null, 2)) : JSON.stringify(metaObj, null, 2)}`;
+        }
 
-        return `${colors.gray ? colors.gray(timestamp) : timestamp} ${coloredLevel} ${coloredTag} ${message}${metaStr}`;
+        return `${coloredTimestamp} ${coloredLevel} ${coloredTag} ${message}${metaStr}`;
     })
 );
 
@@ -72,9 +77,8 @@ class WebhookTransport extends winston.Transport {
     }
     log(info, callback) {
         if (this.url) {
-            axios.post(this.url, {
-                content: `**[${info.level.toUpperCase()}]** ${info.tag ? `[${info.tag}] ` : ''}${info.message}`
-            }).catch(() => {});
+            const content = `**[${info.level.toUpperCase()}]** ${info.tag ? `[${info.tag}] ` : ''}${info.message}`;
+            axios.post(this.url, { content }).catch(() => {});
         }
         callback();
     }
@@ -114,5 +118,10 @@ if (webhookUrl) {
     transports.push(new WebhookTransport({ level: 'warn', url: webhookUrl }));
 }
 
-const logger = winston.createLogger({ levels, transports });
+const logger = winston.createLogger({
+    levels,
+    level: logLevel,
+    transports
+});
+
 module.exports = logger;

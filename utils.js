@@ -122,7 +122,7 @@ function convertTime(miliSeconds, replaceSeconds = "s", replaceMinutes = "m", re
 		else if (formattedDate != '')
 			formattedDate += '00' + datePart.replace;
 		else if (i == dateParts.length - 1)
-			formattedDate += '0' + datePart.replace;
+			formattedDate += '0' + replaceSeconds;
 	}
 
 	if (formattedDate == '')
@@ -841,19 +841,19 @@ const utils = {
 	GoatBotApis,
 
 	/**
-	 * New Helpers inspired by insta-p8
+	 * Enhanced Helpers
 	 */
 
 	/**
 	 * Introduces a random human-like delay
-	 * @param {number} min Minimum delay in ms
-	 * @param {number} max Maximum delay in ms
+	 * @param {number} [min] Minimum delay in ms
+	 * @param {number} [max] Maximum delay in ms
 	 * @returns {Promise<void>}
 	 */
 	humanDelay: async (min, max) => {
 		const config = global.GoatBot?.config?.humanDelay || {};
-		const minDelay = min || config.min || 500;
-		const maxDelay = max || config.max || 2000;
+		const minDelay = min ?? config.min ?? 1500;
+		const maxDelay = max ?? config.max ?? 4000;
 		const delay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
 		return new Promise(resolve => setTimeout(resolve, delay));
 	},
@@ -869,20 +869,22 @@ const utils = {
 	},
 
 	/**
-	 * Basic rate-limit backoff logic
+	 * Enhanced rate-limit backoff logic
 	 * @param {Function} fn The function to execute
-	 * @param {number} retries Number of retries
-	 * @param {number} delay Initial delay in ms
+	 * @param {number} [retries=3] Number of retries
+	 * @param {number} [delay=2000] Initial delay in ms
 	 * @returns {Promise<any>}
 	 */
-	withBackoff: async (fn, retries = 3, delay = 1000) => {
+	withBackoff: async (fn, retries = 3, delay = 2000) => {
 		try {
 			return await fn();
 		} catch (error) {
 			if (retries <= 0) throw error;
 			const errorMessage = error.message || String(error);
-			if (errorMessage.includes('rate limit') || errorMessage.includes('spam') || errorMessage.includes('429')) {
-				const backoffDelay = delay * 2;
+			const isRateLimited = /rate limit|spam|429|too many requests/i.test(errorMessage);
+
+			if (isRateLimited) {
+				const backoffDelay = delay * (4 - retries); // Exponential increase
 				utils.log.warn('BACKOFF', `Rate limit hit, retrying in ${backoffDelay}ms... (Retries left: ${retries})`);
 				await new Promise(resolve => setTimeout(resolve, backoffDelay));
 				return utils.withBackoff(fn, retries - 1, backoffDelay);
@@ -892,7 +894,7 @@ const utils = {
 	},
 
 	/**
-	 * Gets stream from attachment or URL with better error handling and backoff
+	 * Gets stream from URL with improved error handling and backoff
 	 */
 	getStream: async (url, pathName, options = {}) => {
 		return await utils.withBackoff(() => utils.getStreamFromURL(url, pathName, options));

@@ -237,31 +237,36 @@ class InstagramBot {
   }
 
   async loadAndLogin() {
-    const hasCookieFile   = fs.existsSync(config.ACCOUNT_FILE);
-    const hasCredentials  = !!(config.ACCOUNT_EMAIL && config.ACCOUNT_PASSWORD);
-    const cookieContent   = hasCookieFile ? fs.readFileSync(config.ACCOUNT_FILE, 'utf-8') : '';
-    const hasValidCookies = hasCookieFile && this._hasValidCookies(cookieContent);
+    try {
+      const hasCookieFile   = fs.existsSync(config.ACCOUNT_FILE);
+      const hasCredentials  = !!(config.ACCOUNT_EMAIL && config.ACCOUNT_PASSWORD);
+      const cookieContent   = hasCookieFile ? fs.readFileSync(config.ACCOUNT_FILE, 'utf-8') : '';
+      const hasValidCookies = hasCookieFile && this._hasValidCookies(cookieContent);
 
-    if (hasValidCookies) {
-      logger.info('Loading cookies from account.txt...');
-      this.ig = await login(cookieContent);
-    } else if (hasCredentials) {
-      logger.info('No valid cookies found — logging in with email/password...');
-      this.ig = await login({
-        email:    config.ACCOUNT_EMAIL,
-        password: config.ACCOUNT_PASSWORD
-      });
-    } else {
-      throw new Error(
-        'No valid cookies in account.txt and no email/password configured. ' +
-        'Please add Instagram cookies to account.txt or set ACCOUNT_EMAIL/ACCOUNT_PASSWORD.'
-      );
-    }
+      if (hasValidCookies) {
+        logger.info('Loading cookies from account.txt...');
+        this.ig = await login(cookieContent);
+      } else if (hasCredentials) {
+        logger.info('No valid cookies found — logging in with email/password...');
+        this.ig = await login({
+          email:    config.ACCOUNT_EMAIL,
+          password: config.ACCOUNT_PASSWORD
+        });
+      } else {
+        throw new Error(
+          'No valid cookies in account.txt and no email/password configured. ' +
+          'Please add Instagram cookies to account.txt or set ACCOUNT_EMAIL/ACCOUNT_PASSWORD.'
+        );
+      }
 
-    this._afterLogin();
+      this._afterLogin();
 
-    if (hasCredentials && config.AUTO_REFRESH_FBSTATE && config.INTERVAL_GET_NEW_COOKIE) {
-      this._scheduleCookieRefresh();
+      if (hasCredentials && config.AUTO_REFRESH_FBSTATE && config.INTERVAL_GET_NEW_COOKIE) {
+        this._scheduleCookieRefresh();
+      }
+    } catch (error) {
+      logger.error('Login failed', { error: error.message });
+      throw error;
     }
   }
 
@@ -413,6 +418,11 @@ class InstagramBot {
       const { senderID, threadID, messageID, timestamp } = event;
 
       if (senderID && senderID === this.userID) return;
+
+      // Auto mark as read if enabled
+      if (config.OPTIONS_FCA?.autoMarkRead) {
+        this.api.markAsRead(threadID).catch(() => {});
+      }
 
       const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
       if ((timestamp || 0) < fiveMinutesAgo && timestamp) return;
@@ -578,9 +588,9 @@ class InstagramBot {
           // Human-like delay
           await utils.humanDelay();
 
-          if (config.TYPING_INDICATOR) {
+          if (config.TYPING_INDICATOR?.enable) {
             try { ig.sendTypingIndicator(threadID); } catch (_) {}
-            await this._sleep(config.TYPING_INDICATOR_DURATION);
+            await this._sleep(config.TYPING_INDICATOR.duration || 1500);
           }
 
           let result;
@@ -593,7 +603,7 @@ class InstagramBot {
                   // Handle URL strings as attachments
                   if (typeof item === 'string' && item.startsWith('http')) {
                       try {
-                          const stream = await utils.getStreamFromURL(item);
+                          const stream = await utils.getStream(item);
                           const ext = utils.getExtFromMimeType(stream.headers?.['content-type']) || 'png';
                           const tempPath = path.join(process.cwd(), 'temp', `media_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`);
                           await fs.ensureDir(path.dirname(tempPath));
@@ -730,9 +740,9 @@ class InstagramBot {
       sendPhoto: async (photoPath, threadID) => {
         try {
           await utils.humanDelay();
-          if (config.TYPING_INDICATOR) {
+          if (config.TYPING_INDICATOR?.enable) {
             try { ig.sendTypingIndicator(threadID); } catch (_) {}
-            await this._sleep(config.TYPING_INDICATOR_DURATION);
+            await this._sleep(config.TYPING_INDICATOR.duration || 1500);
           }
           return await ig.sendPhoto(threadID, photoPath, {});
         } catch (error) {
@@ -748,9 +758,9 @@ class InstagramBot {
       sendVideo: async (videoPath, threadID) => {
         try {
           await utils.humanDelay();
-          if (config.TYPING_INDICATOR) {
+          if (config.TYPING_INDICATOR?.enable) {
             try { ig.sendTypingIndicator(threadID); } catch (_) {}
-            await this._sleep(config.TYPING_INDICATOR_DURATION);
+            await this._sleep(config.TYPING_INDICATOR.duration || 1500);
           }
           return await ig.sendVideo(threadID, videoPath, {});
         } catch (error) {
@@ -766,9 +776,9 @@ class InstagramBot {
       sendAudio: async (audioPath, threadID) => {
         try {
           await utils.humanDelay();
-          if (config.TYPING_INDICATOR) {
+          if (config.TYPING_INDICATOR?.enable) {
             try { ig.sendTypingIndicator(threadID); } catch (_) {}
-            await this._sleep(config.TYPING_INDICATOR_DURATION);
+            await this._sleep(config.TYPING_INDICATOR.duration || 1500);
           }
           return await ig.sendVoice(threadID, audioPath, {});
         } catch (error) {
@@ -867,9 +877,9 @@ class InstagramBot {
       replyToMessage: async (threadID, text, replyToMessageID) => {
         try {
           await utils.humanDelay();
-          if (config.TYPING_INDICATOR) {
+          if (config.TYPING_INDICATOR?.enable) {
             try { ig.sendTypingIndicator(threadID); } catch (_) {}
-            await this._sleep(config.TYPING_INDICATOR_DURATION);
+            await this._sleep(config.TYPING_INDICATOR.duration || 1500);
           }
           return await ig.replyToMessage(threadID, text, replyToMessageID);
         } catch (error) {
