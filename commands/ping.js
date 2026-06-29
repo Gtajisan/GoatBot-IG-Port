@@ -1,5 +1,5 @@
 module.exports = {
-  config: { name: 'ping', aliases: ['p'], description: 'Check bot response time', usage: 'ping', cooldown: 5, role: 0, category: 'system' },
+  config: { name: 'ping', aliases: ['p'], description: 'Check bot response time', usage: 'ping', cooldown: 5, role: 0, category: 'core' },
   async run({ api, event, logger }) {
     try {
       const start = Date.now();

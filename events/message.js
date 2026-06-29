@@ -152,11 +152,29 @@ module.exports = {
   },
 
   async executeCommand(command, { api, event, args, bot, commandName, logger, database, config, PermissionManager, ConfigManager, prefix }) {
+      const replyApi = new Proxy(api, {
+          get(target, prop) {
+              if (prop === 'sendMessage') {
+                  return async (form, threadID, callback, replyToMessageID) => {
+                      const sent = await target.sendMessage(form, threadID || event.threadId, callback, replyToMessageID || event.messageID);
+                      if (config.AUTO_REMOVE_ERROR?.enable && sent?.messageID) {
+                          const body = typeof form === 'string' ? form : (form.body || '');
+                          const errorPrefixes = ['❌', 'Invalid', 'Could not find', '⚠️', 'Syntax Error', 'Access Denied', '⏰', 'ℹ️', '✕'];
+                          if (errorPrefixes.some(p => body.startsWith(p))) {
+                              database.addAutoRemoveMessage(event.threadId, sent.messageID, (config.AUTO_REMOVE_ERROR.delay || 10) * 1000);
+                          }
+                      }
+                      return sent;
+                  };
+              }
+              return target[prop];
+          }
+      });
       const user = database.getUser(event.senderID);
       if (config.ADMIN_ONLY_ENABLE) {
           const ignored = config.ADMIN_ONLY_IGNORE_COMMANDS.map(n => n.toLowerCase());
           if (!ignored.includes(commandName) && PermissionManager.getUserRole(event.senderID) < 2) {
-              if (!config.HIDE_NOTI.adminOnly) await api.sendMessage('🔒 Bot is in admin-only mode.', event.threadId);
+              if (!config.HIDE_NOTI.adminOnly) await replyApi.sendMessage('🔒 Bot is in admin-only mode.', event.threadId);
               return;
           }
       }
@@ -164,7 +182,7 @@ module.exports = {
       const cooldownTime = (command.config.cooldown || 0) * 1000;
       const remaining = bot.commandLoader.checkCooldown(event.senderID, command.config.name, cooldownTime);
       if (remaining > 0) {
-          await api.sendMessage(`⏰ Please wait ${remaining}s before using this command again.`, event.threadId);
+          await replyApi.sendMessage(`⏰ Please wait ${remaining}s before using this command again.`, event.threadId);
           return;
       }
 
@@ -172,7 +190,7 @@ module.exports = {
       if (spamCheck.isSpam) {
           database.banUser(String(event.senderID));
           moderation.resetSpam(event.senderID);
-          if (spamCheck.message) await api.sendMessage(spamCheck.message, event.threadId);
+          if (spamCheck.message) await replyApi.sendMessage(spamCheck.message, event.threadId);
           return;
       }
 
@@ -182,10 +200,7 @@ module.exports = {
       const hasPermission = await PermissionManager.hasPermission(event.senderID, requiredRole, threadInfo);
       if (!hasPermission) {
           if (!config.HIDE_NOTI.needRoleToUseCmd) {
-              const sent = await api.sendMessage(`❌ Access Denied!\n\nRequires: ${PermissionManager.getRoleName(requiredRole)}`, event.threadId);
-              if (config.AUTO_REMOVE_ERROR?.enable && sent?.messageID) {
-                  database.addAutoRemoveMessage(event.threadId, sent.messageID, (config.AUTO_REMOVE_ERROR.delay || 10) * 1000);
-              }
+              await replyApi.sendMessage(`❌ Access Denied!\n\nRequires: ${PermissionManager.getRoleName(requiredRole)}`, event.threadId);
           }
           return;
       }
@@ -196,16 +211,7 @@ module.exports = {
           database.updateUser(event.senderID, user);
           database.incrementStat('totalCommands');
 
-          const replyApi = new Proxy(api, {
-              get(target, prop) {
-                  if (prop === 'sendMessage') {
-                      return (form, threadID, callback, replyToMessageID) => {
-                          return target.sendMessage(form, threadID || event.threadId, callback, replyToMessageID || event.messageID);
-                      };
-                  }
-                  return target[prop];
-              }
-          });
+
 
           const getLang = (...args) => require('../utils.js').getText(command.config.name, ...args);
           const commandParams = {
@@ -223,24 +229,16 @@ module.exports = {
               PermissionManager,
               ConfigManager,
               message: {
-                  reply: (form, callback) => api.sendMessage(form, event.threadId, callback, event.messageID),
-                  send: (form, callback) => api.sendMessage(form, event.threadId, callback),
+                  reply: (form, callback) => replyApi.sendMessage(form, event.threadId, callback, event.messageID),
+                  send: (form, callback) => replyApi.sendMessage(form, event.threadId, callback),
                   reaction: (emoji, messageID, callback) => api.setMessageReaction(emoji, messageID || event.messageID, callback),
                   unsend: (messageID, callback) => api.unsendMessage(messageID || event.messageID, callback),
                   err: async (err) => {
                       const msg = typeof err === 'object' ? err.message || JSON.stringify(err) : String(err);
-                      const sent = await api.sendMessage(`❌ Error: ${msg}`, event.threadId);
-                      if (config.AUTO_REMOVE_ERROR?.enable && sent?.messageID) {
-                          database.addAutoRemoveMessage(event.threadId, sent.messageID, (config.AUTO_REMOVE_ERROR.delay || 10) * 1000);
-                      }
-                      return sent;
+                      return await replyApi.sendMessage(`❌ Error: ${msg}`, event.threadId);
                   },
                   SyntaxError: async () => {
-                      const sent = await api.sendMessage(`❌ Syntax Error!\nUse: ${prefix}help ${command.config.name} for usage instructions.`, event.threadId);
-                      if (config.AUTO_REMOVE_ERROR?.enable && sent?.messageID) {
-                          database.addAutoRemoveMessage(event.threadId, sent.messageID, (config.AUTO_REMOVE_ERROR.delay || 10) * 1000);
-                      }
-                      return sent;
+                      return await replyApi.sendMessage(`❌ Syntax Error!\nUse: ${prefix}help ${command.config.name} for usage instructions.`, event.threadId);
                   }
               }
           };
@@ -255,10 +253,7 @@ module.exports = {
       } catch (e) {
           logger.error(`Command error: ${command.config.name}`, { error: e.message });
           Banner.commandExecuted(command.config.name, event.senderID, false);
-          const sent = await api.sendMessage(`❌ Error: ${e.message}`, event.threadId);
-          if (config.AUTO_REMOVE_ERROR?.enable && sent?.messageID) {
-              database.addAutoRemoveMessage(event.threadId, sent.messageID, (config.AUTO_REMOVE_ERROR.delay || 10) * 1000);
-          }
+          await replyApi.sendMessage(`❌ Error: ${e.message}`, event.threadId);
       }
   },
 

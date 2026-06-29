@@ -440,7 +440,8 @@ class InstagramBot {
         attachments:    event.attachments    || [],
         isVoiceMessage: event.isVoiceMessage || false,
         isGroup:        event.isGroup        || false,
-        replyToItemId:  event.replyTo        || null
+        replyToItemId:  event.replyTo || (event.messageReply ? event.messageReply.messageID : null),
+        messageReply:   event.messageReply   || null
       };
 
       await this.eventLoader.handleEvent('message', normalizedEvent);
