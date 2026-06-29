@@ -1,18 +1,63 @@
 module.exports = {
-  config: { name: 'stats', aliases: ['statistics', 'botstats'], description: 'View bot/user statistics', usage: 'stats', cooldown: 5, role: 0, category: 'info' },
+  config: {
+    name: 'stats',
+    aliases: ['statistics', 'botstats', 'botinfo'],
+    description: 'View bot statistics and user info',
+    usage: 'stats [user]',
+    cooldown: 5,
+    role: 0,
+    author: 'Gtajisan',
+    category: 'info'
+  },
+
   async run({ api, event, bot, logger, database, config }) {
     try {
-      const user = database.getUser(event.senderID);
+      const userId = event.senderID;
+
+      // Get user stats
+      const user = database.getUser(userId);
       const allUsers = database.getAllUsers();
       const allStats = database.getAllStats();
-      const sorted = allUsers.sort((a, b) => (b.messageCount || 0) - (a.messageCount || 0));
-      const rank = sorted.findIndex(u => u.id === event.senderID) + 1;
+
+      // Calculate bot stats
+      const totalUsers = allUsers.length;
+      const totalMessages = allStats.totalMessages || allUsers.reduce((sum, u) => sum + (u.messageCount || 0), 0);
+      const totalCommands = allStats.totalCommands || allUsers.reduce((sum, u) => sum + (u.commandCount || 0), 0);
+
+      // Calculate user rank
+      const sortedUsers = allUsers.sort((a, b) => (b.messageCount || 0) - (a.messageCount || 0));
+      const userRank = sortedUsers.findIndex(u => String(u.id || u.userID) === String(userId)) + 1;
+
+      // Format dates
+      const firstSeen = user.firstSeen ? new Date(user.firstSeen).toLocaleDateString() : 'Unknown';
+      const lastSeen = user.lastSeen ? new Date(user.lastSeen).toLocaleDateString() : 'Unknown';
+
+      let message = `📊 Statistics\n\n`;
+      message += `Your Stats\n`;
+      message += `👤 User ID: ${userId}\n`;
+      message += `📨 Messages: ${user.messageCount || 0}\n`;
+      message += `⚡ Commands: ${user.commandCount || 0}\n`;
+      message += `🏆 Rank: #${userRank} / ${totalUsers}\n`;
+      message += `📅 First seen: ${firstSeen}\n`;
+      message += `🕐 Last active: ${lastSeen}\n\n`;
+
+      message += `Bot Stats\n`;
+      message += `👥 Total users: ${totalUsers}\n`;
+      message += `💬 Total messages: ${totalMessages}\n`;
+      message += `⚡ Total commands: ${totalCommands}\n`;
+      message += `📦 Commands: ${bot.commandLoader.getAllCommandNames().length}\n`;
+      message += `🎯 Events: ${bot.eventLoader.getAllEventNames().length}\n\n`;
+
       const uptime = process.uptime();
-      const h = Math.floor(uptime / 3600), m = Math.floor((uptime % 3600) / 60);
-      let msg = `📊 Statistics\n\n👤 Your Stats\n`;
-      msg += `🆔 UID: ${event.senderID}\n📨 Messages: ${user.messageCount || 0}\n⚡ Commands: ${user.commandCount || 0}\n🏆 Rank: #${rank}/${allUsers.length}\n\n`;
-      msg += `🤖 Bot Stats\n👥 Users: ${allUsers.length}\n📦 Commands: ${bot.commandLoader.getAllCommandNames().length}\n🎯 Events: ${bot.eventLoader.getAllEventNames().length}\n⏱️ Uptime: ${h}h ${m}m`;
-      return api.sendMessage(msg, event.threadId);
-    } catch (e) { logger.error('Error in stats', { error: e.message }); return api.sendMessage('❌ Error fetching stats.', event.threadId); }
+      const hours = Math.floor(uptime / 3600);
+      const minutes = Math.floor((uptime % 3600) / 60);
+      message += `⏱️ Uptime: ${hours}h ${minutes}m`;
+
+      return api.sendMessage(message, event.threadId);
+
+    } catch (error) {
+      logger.error('Error in stats command', { error: error.message });
+      return api.sendMessage('❌ Error fetching statistics.', event.threadId);
+    }
   }
 };
