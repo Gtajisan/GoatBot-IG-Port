@@ -14,7 +14,7 @@ module.exports = {
     author: "Neoaz",
     cooldown: 5,
     role: 0,
-    description: "Banking system",
+    description: "Banking",
     category: "economy"
   },
 

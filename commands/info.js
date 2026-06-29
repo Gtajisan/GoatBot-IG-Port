@@ -1,5 +1,5 @@
 module.exports = {
-  config: { name: 'info', aliases: ['about'], description: 'Show bot information', usage: 'info', cooldown: 5, role: 0, category: 'system' },
+  config: { name: 'info', aliases: ['about'], description: 'Show bot information', usage: 'info', cooldown: 5, role: 0, category: 'core' },
   async run({ api, event, bot, logger, config }) {
     try {
       const uptime = process.uptime();

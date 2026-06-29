@@ -102,7 +102,7 @@ module.exports = {
 		guide: "{p}{n} <character id or character name> | <background text> | <signature> | <background color name or hex color>\n{p}{n} help: view how to use this command",
 		text: {
 			initImage: "Initializing image, please wait...",
-			invalidCharacter: "Currently there are only %1 characters on the system, please enter a character id less than",
+			invalidCharacter: "Currently there are only %1 characters in the bot, please enter a character id less than",
 			notFoundCharacter: "No character named %1 was found in the character list",
 			errorGetCharacter: "An error occurred while getting character data:\n%1: %2",
 			success: "✅ Your avatar\nCharacter: %1\nID: %2\nBackground text: %3\nSignature: %4\nColor: %5",
@@ -388,15 +388,15 @@ module.exports = {
 	},
 	prefix: {
 		description: "Thay đổi dấu lệnh của bot trong box chat của bạn hoặc cả hệ thống bot (chỉ admin bot)",
-		guide: "   {pn} <new prefix>: change new prefix in your box chat\n   Example:\n    {pn} #\n\n   {pn} <new prefix> -g: change new prefix in system bot (only admin bot)\n   Example:\n    {pn} # -g\n\n   {pn} reset: change prefix in your box chat to default",
+		guide: "   {pn} <new prefix>: change new prefix in your box chat\n   Example:\n    {pn} #\n\n   {pn} <new prefix> -g: change new prefix in global bot (only admin bot)\n   Example:\n    {pn} # -g\n\n   {pn} reset: change prefix in your box chat to default",
 		text: {
 			reset: "Your prefix has been reset to default: %1",
-			onlyAdmin: "Only admin can change prefix of system bot",
-			confirmGlobal: "Please react to this message to confirm change prefix of system bot",
+			onlyAdmin: "Only admin can change prefix of global bot",
+			confirmGlobal: "Please react to this message to confirm change prefix of global bot",
 			confirmThisThread: "Please react to this message to confirm change prefix in your box chat",
-			successGlobal: "Changed prefix of system bot to: %1",
+			successGlobal: "Changed prefix of global bot to: %1",
 			successThisThread: "Changed prefix in your box chat to: %1",
-			myPrefix: "🌐 System prefix: %1\n🛸 Your box chat prefix: %2"
+			myPrefix: "🌐 Global prefix: %1\n🛸 Your box chat prefix: %2"
 		}
 	},
 	rank: {
@@ -454,7 +454,7 @@ module.exports = {
 	},
 	setalias: {
 		description: "Add an alias for any command in your group",
-		guide: "  This command is used to add/remove alias for any command in your group\n   {pn} add <alias> <command>: add an alias for the command in your group\n   {pn} add <alias> <command> -g: add an alias for the command in the whole system (only bot admin)\nExample:\n    {pn} add ctrk customrankcard\n\n   {pn} [remove | rm] <alias> <command>: remove an alias for the command in your group\n   {pn} [remove | rm] <alias> <command> -g: remove an alias for the command in the whole system (only bot admin)\nExample:\n    {pn} rm ctrk customrankcard\n\n   {pn} list: list all alias for commands in your group\n   {pn} list -g: list all alias for commands in the whole system"
+		guide: "  This command is used to add/remove alias for any command in your group\n   {pn} add <alias> <command>: add an alias for the command in your group\n   {pn} add <alias> <command> -g: add an alias for the command in the whole bot (only bot admin)\nExample:\n    {pn} add ctrk customrankcard\n\n   {pn} [remove | rm] <alias> <command>: remove an alias for the command in your group\n   {pn} [remove | rm] <alias> <command> -g: remove an alias for the command in the whole bot (only bot admin)\nExample:\n    {pn} rm ctrk customrankcard\n\n   {pn} list: list all alias for commands in your group\n   {pn} list -g: list all alias for commands in the whole bot"
 	},
 	setavt: {
 		description: "Change bot avatar",
@@ -575,7 +575,7 @@ module.exports = {
 		}
 	},
 	thread: {
-		description: "Manage group chat in bot system",
+		description: "Manage group chat in bot data",
 		guide: "   {pn} [find | -f | search | -s] <name to find>: search group chat in bot data by name\n   {pn} [find | -f | search | -s] [-j | joined] <name to find>: search group chat in bot data that bot still joined by name\n   {pn} [ban | -b] [<tid> | leave blank] <reason>: use to ban group with id <tid> or current group using bot\n   Example:\n    {pn} ban 3950898668362484 spam bot\n    {pn} ban spam too much\n    {pn} unban [<tid> | leave blank] to unban group with id <tid> or current group",
 		text: {
 			noPermission: "You don't have permission to use this feature",
@@ -624,7 +624,7 @@ module.exports = {
 		}
 	},
 	user: {
-		description: "Manage users in bot system",
+		description: "Manage users in bot data",
 		guide: "   {pn} [find | -f | search | -s] <name to find>: search for users in bot data by name\n\n   {pn} [ban | -b] [<uid> | @tag | reply message] <reason>: to ban user with id <uid> or tagged user or sender of message replied using bot\n\n   {pn} unban [<uid> | @tag | reply message]: to unban user using bot",
 		text: {
 			noUserFound: "❌ No user found with name matching keyword: \"%1\" in bot data",

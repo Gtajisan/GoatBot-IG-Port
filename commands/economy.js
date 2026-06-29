@@ -5,7 +5,7 @@ module.exports = {
   config: {
     name: 'economy',
     aliases: ['bal', 'balance', 'daily', 'pay', 'wallet'],
-    description: 'Economy system — check balance, claim daily reward, transfer coins',
+    description: 'Economy — check balance, claim daily reward, transfer coins',
     usage: 'economy [balance|daily|pay <userID> <amount>]',
     role: 0,
     cooldown: 3,

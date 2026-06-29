@@ -1,12 +1,12 @@
 module.exports = {
-  config: { name: 'help', aliases: ['menu', 'commands', 'h'], version: '1.0', author: 'Gtajisan', description: 'Show all commands or info about one', usage: 'help [command]', cooldown: 3, role: 0, category: 'system' },
+  config: { name: 'help', aliases: ['menu', 'commands', 'h'], version: '1.0', author: 'Gtajisan', description: 'Show all commands or info about one', usage: 'help [command]', cooldown: 3, role: 0, category: 'core' },
   async run({ api, event, args, bot, config, logger }) {
     try {
       const { commandLoader } = bot;
       const prefix = config.PREFIX;
       const allCommands = commandLoader.commands;
       const roleNames = { 0: 'Normal User', 1: 'Group Admin', 2: 'Bot Admin', 3: 'Premium User', 4: 'Developer' };
-      const emojiMap = { ai: '🤖', system: '⚙️', fun: '🎮', economy: '💰', media: '🎬', tools: '🛠️', utility: '🛠️', info: 'ℹ️', game: '🎲', admin: '👑', moderation: '🛡️', owner: '👑', config: '🔧', others: '📦' };
+      const emojiMap = { ai: '🤖', core: '⚙️', fun: '🎮', economy: '💰', media: '🎬', tools: '🛠️', utility: '🛠️', info: 'ℹ️', game: '🎲', admin: '👑', moderation: '🛡️', owner: '👑', config: '🔧', others: '📦' };
       const cleanCat = t => (!t ? 'others' : t.normalize('NFKD').replace(/[^\w\s-]/g,'').trim().toLowerCase()) || 'others';
 
       if (args.length > 0) {
