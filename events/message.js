@@ -19,6 +19,7 @@ module.exports = {
 
       if (!config.LOG_EVENTS.disableAll && config.LOG_EVENTS.message) {
         Banner.messageReceived(event.senderID, event.body || '');
+        logger.info(`Message from ${event.senderID} in ${event.threadId}: ${event.body || '(no text)'}`);
       }
 
       const user = database.getUser(event.senderID);
@@ -111,6 +112,15 @@ module.exports = {
       const command = commandLoader.getCommand(commandName);
 
       if (!command) {
+          // Check for aliases
+          for (const [name, cmd] of commandLoader.commands) {
+              if (cmd.config.aliases && cmd.config.aliases.includes(commandName)) {
+                  const aliasedCommand = cmd;
+                  // Found alias, continue execution with aliasedCommand
+                  return await this.executeCommand(aliasedCommand, { api, event, args, bot, commandName: aliasedCommand.config.name, logger, database, config, PermissionManager, ConfigManager, prefix });
+              }
+          }
+
         if (startsWithPrefix && !config.HIDE_NOTI.commandNotFound) {
           // AI Fallback logic
           if (config.AI_FALLBACK?.enable) {
@@ -132,27 +142,35 @@ module.exports = {
         return;
       }
 
+      await this.executeCommand(command, { api, event, args, bot, commandName, logger, database, config, PermissionManager, ConfigManager, prefix });
+    } catch (e) {
+      logger.error('Error in message event handler', { error: e.message, stack: e.stack });
+    }
+  },
+
+  async executeCommand(command, { api, event, args, bot, commandName, logger, database, config, PermissionManager, ConfigManager, prefix }) {
+      const user = database.getUser(event.senderID);
       if (config.ADMIN_ONLY_ENABLE) {
-        const ignored = config.ADMIN_ONLY_IGNORE_COMMANDS.map(n => n.toLowerCase());
-        if (!ignored.includes(commandName) && PermissionManager.getUserRole(event.senderID) < 2) {
-          if (!config.HIDE_NOTI.adminOnly) await api.sendMessage('🔒 Bot is in admin-only mode.', event.threadId);
-          return;
-        }
+          const ignored = config.ADMIN_ONLY_IGNORE_COMMANDS.map(n => n.toLowerCase());
+          if (!ignored.includes(commandName) && PermissionManager.getUserRole(event.senderID) < 2) {
+              if (!config.HIDE_NOTI.adminOnly) await api.sendMessage('🔒 Bot is in admin-only mode.', event.threadId);
+              return;
+          }
       }
 
       const cooldownTime = (command.config.cooldown || 0) * 1000;
-      const remaining    = commandLoader.checkCooldown(event.senderID, command.config.name, cooldownTime);
+      const remaining = bot.commandLoader.checkCooldown(event.senderID, command.config.name, cooldownTime);
       if (remaining > 0) {
-        await api.sendMessage(`⏰ Please wait ${remaining}s before using this command again.`, event.threadId);
-        return;
+          await api.sendMessage(`⏰ Please wait ${remaining}s before using this command again.`, event.threadId);
+          return;
       }
 
       const spamCheck = moderation.checkCommandSpam(event.senderID);
       if (spamCheck.isSpam) {
-        database.banUser(String(event.senderID));
-        moderation.resetSpam(event.senderID);
-        if (spamCheck.message) await api.sendMessage(spamCheck.message, event.threadId);
-        return;
+          database.banUser(String(event.senderID));
+          moderation.resetSpam(event.senderID);
+          if (spamCheck.message) await api.sendMessage(spamCheck.message, event.threadId);
+          return;
       }
 
       const requiredRole = command.config.role || 0;
@@ -160,74 +178,71 @@ module.exports = {
       if (requiredRole === 1) threadInfo = await bot.getThreadInfo(event.threadId).catch(() => null);
       const hasPermission = await PermissionManager.hasPermission(event.senderID, requiredRole, threadInfo);
       if (!hasPermission) {
-        if (!config.HIDE_NOTI.needRoleToUseCmd) {
-          await api.sendMessage(`❌ Access Denied!\n\nRequires: ${PermissionManager.getRoleName(requiredRole)}`, event.threadId);
-        }
-        return;
+          if (!config.HIDE_NOTI.needRoleToUseCmd) {
+              await api.sendMessage(`❌ Access Denied!\n\nRequires: ${PermissionManager.getRoleName(requiredRole)}`, event.threadId);
+          }
+          return;
       }
 
       try {
-        Banner.commandExecuted(command.config.name, event.senderID, true);
-        user.commandCount = (user.commandCount || 0) + 1;
-        database.updateUser(event.senderID, user);
-        database.incrementStat('totalCommands');
+          Banner.commandExecuted(command.config.name, event.senderID, true);
+          user.commandCount = (user.commandCount || 0) + 1;
+          database.updateUser(event.senderID, user);
+          database.incrementStat('totalCommands');
 
-        const replyApi = new Proxy(api, {
-          get(target, prop) {
-            if (prop === 'sendMessage') {
-              return async (text, threadID) => {
-                try { return await target.replyToMessage(threadID, text, event.messageID); }
-                catch (_) { return await target.sendMessage(text, threadID); }
-              };
-            }
-            return target[prop];
+          const replyApi = new Proxy(api, {
+              get(target, prop) {
+                  if (prop === 'sendMessage') {
+                      return (form, threadID, callback, replyToMessageID) => {
+                          return target.sendMessage(form, threadID || event.threadId, callback, replyToMessageID || event.messageID);
+                      };
+                  }
+                  return target[prop];
+              }
+          });
+
+          const getLang = (...args) => require('../utils.js').getText(command.config.name, ...args);
+          const commandParams = {
+              api: replyApi,
+              event,
+              args,
+              bot,
+              commandName: command.config.name,
+              logger,
+              database,
+              usersData: database.usersData,
+              threadsData: database.threadsData,
+              config,
+              getLang,
+              PermissionManager,
+              ConfigManager,
+              message: {
+                  reply: (form, callback) => api.sendMessage(form, event.threadId, callback, event.messageID),
+                  send: (form, callback) => api.sendMessage(form, event.threadId, callback),
+                  reaction: (emoji, messageID, callback) => api.setMessageReaction(emoji, messageID || event.messageID, callback),
+                  unsend: (messageID, callback) => api.unsendMessage(messageID || event.messageID, callback),
+                  err: (err) => {
+                      const msg = typeof err === 'object' ? err.message || JSON.stringify(err) : String(err);
+                      return api.sendMessage(`❌ Error: ${msg}`, event.threadId);
+                  },
+                  SyntaxError: () => {
+                      return api.sendMessage(`❌ Syntax Error!\nUse: ${prefix}help ${command.config.name} for usage instructions.`, event.threadId);
+                  }
+              }
+          };
+
+          logger.info(`Executing command: ${command.config.name} for ${event.senderID}`);
+          if (typeof command.onStart === 'function') {
+              await command.onStart(commandParams);
+          } else if (typeof command.run === 'function') {
+              await command.run(commandParams);
           }
-        });
-
-        const getLang = (...args) => require('../utils.js').getText(command.config.name, ...args);
-        const commandParams = {
-            api: replyApi,
-            event,
-            args,
-            bot,
-            commandName: command.config.name,
-            logger,
-            database,
-            usersData: database.usersData,
-            threadsData: database.threadsData,
-            config,
-            getLang,
-            PermissionManager,
-            ConfigManager,
-            message: {
-                reply: (form, callback) => replyApi.sendMessage(form, event.threadId, callback, event.messageID),
-                send: (form, callback) => replyApi.sendMessage(form, event.threadId, callback),
-                reaction: (emoji, messageID, callback) => replyApi.setMessageReaction(emoji, messageID || event.messageID, callback),
-                unsend: (messageID, callback) => replyApi.unsendMessage(messageID || event.messageID, callback),
-                err: (err) => {
-                    const msg = typeof err === 'object' ? err.message || JSON.stringify(err) : String(err);
-                    return replyApi.sendMessage(`❌ Error: ${msg}`, event.threadId);
-                },
-                SyntaxError: () => {
-                    return replyApi.sendMessage(`❌ Syntax Error!\nUse: ${prefix}help ${command.config.name} for usage instructions.`, event.threadId);
-                }
-            }
-        };
-
-        if (typeof command.onStart === 'function') {
-            await command.onStart(commandParams);
-        } else if (typeof command.run === 'function') {
-            await command.run(commandParams);
-        }
-        if (cooldownTime > 0) commandLoader.setCooldown(event.senderID, command.config.name, cooldownTime);
+          if (cooldownTime > 0) bot.commandLoader.setCooldown(event.senderID, command.config.name, cooldownTime);
       } catch (e) {
-        logger.error(`Command error: ${command.config.name}`, { error: e.message });
-        Banner.commandExecuted(command.config.name, event.senderID, false);
-        await api.sendMessage(`❌ Error: ${e.message}`, event.threadId);
+          logger.error(`Command error: ${command.config.name}`, { error: e.message });
+          Banner.commandExecuted(command.config.name, event.senderID, false);
+          await api.sendMessage(`❌ Error: ${e.message}`, event.threadId);
       }
-    } catch (e) {
-      logger.error('Error in message event handler', { error: e.message, stack: e.stack });
-    }
   },
 
   findClosestCommand(input, list) {

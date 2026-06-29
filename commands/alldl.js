@@ -24,11 +24,11 @@ module.exports = {
       if (!data.url) return message.reply('❌ Failed to fetch download link.');
 
       if (data.type === 'video') {
-          await api.sendVideoFromUrl(event.threadId, data.url, { caption: data.title || '✅ Downloaded' });
+          await message.reply({ body: data.title || '✅ Downloaded', attachment: data.url });
       } else if (data.type === 'audio') {
-          await api.sendVoiceFromUrl(event.threadId, data.url);
+          await message.reply({ attachment: data.url });
       } else if (data.type === 'image') {
-          await api.sendPhotoFromUrl(event.threadId, data.url);
+          await message.reply({ attachment: data.url });
       } else {
           message.reply(`Here is your download link: ${data.url}`);
       }

@@ -23,7 +23,7 @@ module.exports = {
 
     try {
       const imageUrl = `${API_ENDPOINT}?prompt=${encodeURIComponent(prompt)}&m=imagen4`;
-      await api.sendPhotoFromUrl(event.threadId, imageUrl);
+      await message.reply({ attachment: imageUrl });
       message.reaction('✅');
     } catch (error) {
       logger.error('imagen4 error', { error: error.message });

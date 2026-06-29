@@ -21,8 +21,9 @@ module.exports = {
 
       if (!data.video_url) return message.reply('Failed to fetch video URL.');
 
-      await api.sendVideoFromUrl(event.threadId, data.video_url, {
-          caption: `🎥 Tiktok Download\n👤 User: ${data.author || 'Unknown'}\n📝 Caption: ${data.title || 'No Title'}`
+      await message.reply({
+          body: `🎥 Tiktok Download\n👤 User: ${data.author || 'Unknown'}\n📝 Caption: ${data.title || 'No Title'}`,
+          attachment: data.video_url
       });
       message.reaction('✅');
     } catch (error) {

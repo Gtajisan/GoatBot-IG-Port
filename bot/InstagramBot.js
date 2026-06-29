@@ -2,7 +2,8 @@
 
 const { login } = require('@neoaz07/nkxica');
 
-const fs   = require('fs');
+const fs = require('fs-extra');
+const path = require('path');
 const http = require('http');
 const cron = require('node-cron');
 const axios = require('axios');
@@ -30,9 +31,6 @@ class InstagramBot {
 
   startHealthServer() {
     const port = parseInt(process.env.PORT || config.DASHBOARD_PORT || 3000, 10);
-    const fs2  = require('fs');
-    const path = require('path');
-
     const dashboardHtml = path.join(__dirname, '..', 'dashboard', 'index.html');
 
     const recentActivity = [];
@@ -47,7 +45,7 @@ class InstagramBot {
       // ── Dashboard HTML ──────────────────────────────────────────────
       if (url === '/' || url === '/dashboard') {
         try {
-          const html = fs2.readFileSync(dashboardHtml, 'utf-8');
+          const html = fs.readFileSync(dashboardHtml, 'utf-8');
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           return res.end(html);
         } catch {
@@ -164,7 +162,7 @@ class InstagramBot {
         const logFile = path.join(process.cwd(), 'logs', `combined-${today}.log`);
         try {
           let raw = '';
-          if (fs2.existsSync(logFile)) raw = fs2.readFileSync(logFile, 'utf-8');
+          if (fs.existsSync(logFile)) raw = fs.readFileSync(logFile, 'utf-8');
           const logs = raw.trim().split('\n').filter(Boolean).slice(-300).map(line => {
             try {
               const parsed = JSON.parse(line);
@@ -288,7 +286,6 @@ class InstagramBot {
     this.api               = this.createAPIWrapper();
     global.GoatBot.fcaApi  = this.api;
     global.GoatBot.instance = this;
-    global.GoatBot.fcaApi = this.api;
 
     // Call onLoad for commands now that API is ready
     const database = require('../utils/database');
@@ -546,7 +543,7 @@ class InstagramBot {
     const utils = require('../utils.js');
 
     return {
-      sendMessage: async (form, threadID, callback, messageID) => {
+      sendMessage: async (form, threadID, callback, replyToMessageID) => {
         try {
           if (typeof threadID === 'function') {
               callback = threadID;
@@ -554,7 +551,7 @@ class InstagramBot {
           }
           if (!threadID) threadID = form.threadID || form.threadId;
 
-          let text = typeof form === 'object' ? form.body || '' : String(form);
+          let text = typeof form === 'object' ? (form.body !== undefined ? form.body : '') : String(form);
           let attachment = typeof form === 'object' ? form.attachment : null;
 
           // Human-like delay
@@ -567,27 +564,84 @@ class InstagramBot {
 
           let result;
           if (attachment) {
-              if (Array.isArray(attachment)) attachment = attachment[0];
-              // Support for different attachment types if we have path or stream
-              if (typeof attachment === 'string' || (attachment && attachment.path)) {
-                  const path = attachment.path || attachment;
-                  if (path.endsWith('.mp4') || path.endsWith('.mov')) result = await ig.sendVideo(threadID, path, { caption: text });
-                  else if (path.endsWith('.mp3') || path.endsWith('.wav') || path.endsWith('.m4a')) result = await ig.sendVoice(threadID, path);
-                  else result = await ig.sendPhoto(threadID, path, { caption: text });
-              } else if (attachment && attachment.readable) {
-                  // If it's a stream, we might need to save it or the API might handle it
-                  // For now, assume URL-like or we convert to temp file if needed
-                  result = await ig.sendMessage(text, threadID);
+              const attachments = Array.isArray(attachment) ? attachment : [attachment];
+              const tempFiles = [];
+              for (const item of attachments) {
+                  let mediaPath = item.path || (typeof item === 'string' ? item : null);
+
+                  // Handle URL strings as attachments
+                  if (typeof item === 'string' && item.startsWith('http')) {
+                      try {
+                          const stream = await utils.getStreamFromURL(item);
+                          const ext = utils.getExtFromMimeType(stream.headers?.['content-type']) || 'png';
+                          const tempPath = path.join(process.cwd(), 'temp', `media_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`);
+                          await fs.ensureDir(path.dirname(tempPath));
+                          const writer = fs.createWriteStream(tempPath);
+                          stream.pipe(writer);
+                          await new Promise((resolve, reject) => {
+                              writer.on('finish', resolve);
+                              writer.on('error', reject);
+                          });
+                          mediaPath = tempPath;
+                          tempFiles.push(tempPath);
+                      } catch (e) {
+                          logger.error('Failed to download attachment from URL', { url: item, error: e.message });
+                      }
+                  }
+                  // Handle Streams and Buffers
+                  else if (item && (item.readable || item.pipe || Buffer.isBuffer(item))) {
+                      const ext = item.filename ? path.extname(item.filename) : (item.name ? path.extname(item.name) : '');
+                      const tempPath = path.join(process.cwd(), 'temp', `media_${Date.now()}_${Math.random().toString(36).substring(7)}${ext}`);
+                      await fs.ensureDir(path.dirname(tempPath));
+
+                      if (Buffer.isBuffer(item)) {
+                          await fs.writeFile(tempPath, item);
+                      } else {
+                          const writer = fs.createWriteStream(tempPath);
+                          item.pipe(writer);
+                          await new Promise((resolve, reject) => {
+                              writer.on('finish', resolve);
+                              writer.on('error', reject);
+                          });
+                      }
+                      mediaPath = tempPath;
+                      tempFiles.push(tempPath);
+                  }
+
+                  if (mediaPath) {
+                      const lowerPath = mediaPath.toLowerCase();
+                      const opts = { caption: text };
+                      if (replyToMessageID) opts.replyToMessageID = replyToMessageID;
+
+                      if (lowerPath.endsWith('.mp4') || lowerPath.endsWith('.mov') || lowerPath.endsWith('.mkv') || lowerPath.endsWith('.webm')) {
+                          result = await ig.sendVideo(threadID, mediaPath, opts);
+                      } else if (lowerPath.endsWith('.mp3') || lowerPath.endsWith('.wav') || lowerPath.endsWith('.m4a') || lowerPath.endsWith('.ogg')) {
+                          result = await ig.sendVoice(threadID, mediaPath);
+                      } else {
+                          result = await ig.sendPhoto(threadID, mediaPath, opts);
+                      }
+                  }
+              }
+              // Cleanup temp files after sending
+              for (const f of tempFiles) {
+                  fs.unlink(f).catch(() => {});
+              }
+          } else {
+              if (replyToMessageID) {
+                  try {
+                      result = await ig.replyToMessage(threadID, text, replyToMessageID);
+                  } catch (e) {
+                      result = await ig.sendMessage(text, threadID);
+                  }
               } else {
                   result = await ig.sendMessage(text, threadID);
               }
-          } else {
-              result = await ig.sendMessage(text, threadID);
           }
 
-          if (result?.messageID) {
+          if (result?.messageID || result?.messageId) {
+            const mID = result.messageID || result.messageId;
             const db = require('../utils/database');
-            db.storeSentMessage(threadID, result.messageID);
+            db.storeSentMessage(threadID, mID);
           }
           if (typeof callback === 'function') callback(null, result);
           return result;
@@ -690,8 +744,12 @@ class InstagramBot {
         }
       },
 
-      unsendMessage: async (messageID, callback) => {
+      unsendMessage: async (messageID, threadID, callback) => {
         try {
+          if (typeof threadID === 'function') {
+              callback = threadID;
+              threadID = null;
+          }
           const res = await ig.unsendMessage(messageID);
           if (typeof callback === 'function') callback(null, res);
           return res;
@@ -709,6 +767,14 @@ class InstagramBot {
 
       getUserInfo: async (userID) => {
         try {
+          // If userID is array
+          if (Array.isArray(userID)) {
+              const res = {};
+              for (const id of userID) {
+                  res[id] = await ig.getUserInfo(id);
+              }
+              return res;
+          }
           const info = await ig.getUserInfo(userID);
           return { [userID]: info };
         } catch (error) {

@@ -28,9 +28,9 @@ module.exports = {
       if (!data.url) return message.reply('❌ Failed to fetch download link.');
 
       if (type === '-v') {
-          await api.sendVideoFromUrl(event.threadId, data.url, { caption: data.title });
+          await message.reply({ body: data.title || '', attachment: data.url });
       } else {
-          await api.sendVoiceFromUrl(event.threadId, data.url);
+          await message.reply({ attachment: data.url });
       }
       message.reaction('✅');
     } catch (error) {

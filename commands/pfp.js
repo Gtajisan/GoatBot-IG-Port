@@ -57,7 +57,13 @@ module.exports = {
 
       api.sendMessage('🔍 Fetching profile picture...', event.threadId);
 
-      const userInfo = isUid ? await api.getUserInfo(targetInput) : await api.getUserInfoByUsername(targetInput);
+      let userInfo;
+      if (isUid) {
+          const infoObj = await api.getUserInfo(targetInput);
+          userInfo = infoObj[targetInput];
+      } else {
+          userInfo = await api.getUserInfoByUsername(targetInput);
+      }
 
       if (!userInfo) {
         return api.sendMessage(`❌ User ${isUid ? targetInput : '@' + targetInput} not found or account is private.`, event.threadId);
@@ -90,7 +96,7 @@ module.exports = {
     caption += `🔗 Profile: https://instagram.com/${username}`;
 
     try {
-        await api.sendPhotoFromUrl(event.threadId, pfpUrl, { caption });
+        await api.sendMessage({ body: caption, attachment: pfpUrl }, event.threadId);
     } catch (error) {
         api.sendMessage(`${caption}\n\n🖼️ PFP URL: ${pfpUrl}`, event.threadId);
     }
