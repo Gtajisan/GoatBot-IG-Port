@@ -1,6 +1,4 @@
 const axios = require("axios");
-const fs = require("fs-extra");
-const path = require("path");
 
 const noobcore = "https://raw.githubusercontent.com/noobcore404/NC-STORE/main/NCApiUrl.json";
 
@@ -14,7 +12,7 @@ module.exports = {
   config: {
     name: "edit",
     aliases: ["nanobanana", "gptimage"],
-    version: "1.1",
+    version: "1.2",
     author: "Gtajisan",
     cooldown: 5,
     role: 0,
@@ -32,10 +30,6 @@ module.exports = {
     }
 
     message.reaction("⏳");
-    const loadingMsg = await message.reply("⏳ Processing your image...");
-
-    const cacheDir = path.join(__dirname, "cache");
-    const imgPath = path.join(cacheDir, `${Date.now()}_edit.png`);
 
     try {
       const BASE_URL = await getRenzApi();
@@ -58,38 +52,18 @@ module.exports = {
         apiURL += `&width=512&height=512`;
       }
 
-      const res = await axios.get(apiURL, { responseType: "arraybuffer", timeout: 180000 });
-
-      await fs.ensureDir(cacheDir);
-      await fs.writeFile(imgPath, res.data);
-
-      if (loadingMsg && loadingMsg.messageID) {
-        await api.unsendMessage(loadingMsg.messageID).catch(() => {});
-      }
-
       await message.reply({
         body: hasImageReply
           ? `🖌 Image edited successfully.\nPrompt: ${prompt}\n\n(Tap to hold to save/view image)`
           : `🖼 Image generated successfully.\nPrompt: ${prompt}\n\n(Tap to hold to save/view image)`,
-        attachment: fs.createReadStream(imgPath)
+        attachment: apiURL
       });
 
       message.reaction("✅");
-
-      setTimeout(() => fs.unlink(imgPath).catch(() => {}), 10000);
     } catch (err) {
       logger.error("EDIT Command Error:", err?.response?.data || err.message);
-
-      if (loadingMsg && loadingMsg.messageID) {
-        await api.unsendMessage(loadingMsg.messageID).catch(() => {});
-      }
-
       message.reaction("❌");
       message.reply("❌ Failed to process image. Please try again later.");
-
-      if (await fs.pathExists(imgPath)) {
-        await fs.unlink(imgPath).catch(() => {});
-      }
     }
   }
 };
