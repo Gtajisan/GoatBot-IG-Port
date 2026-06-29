@@ -137,7 +137,10 @@ module.exports = {
           let msg = `❌ Unknown command: "${commandName}"\n\n`;
           if (closest && closest.distance <= 3) msg += `💡 Did you mean: ${prefix}${closest.command}?\n\n`;
           msg += `Type ${prefix}help to see all available commands.`;
-          await api.sendMessage(msg, event.threadId);
+          const sent = await api.sendMessage(msg, event.threadId);
+          if (config.AUTO_REMOVE_ERROR?.enable && sent?.messageID) {
+              database.addAutoRemoveMessage(event.threadId, sent.messageID, (config.AUTO_REMOVE_ERROR.delay || 10) * 1000);
+          }
         }
         return;
       }
@@ -179,7 +182,10 @@ module.exports = {
       const hasPermission = await PermissionManager.hasPermission(event.senderID, requiredRole, threadInfo);
       if (!hasPermission) {
           if (!config.HIDE_NOTI.needRoleToUseCmd) {
-              await api.sendMessage(`❌ Access Denied!\n\nRequires: ${PermissionManager.getRoleName(requiredRole)}`, event.threadId);
+              const sent = await api.sendMessage(`❌ Access Denied!\n\nRequires: ${PermissionManager.getRoleName(requiredRole)}`, event.threadId);
+              if (config.AUTO_REMOVE_ERROR?.enable && sent?.messageID) {
+                  database.addAutoRemoveMessage(event.threadId, sent.messageID, (config.AUTO_REMOVE_ERROR.delay || 10) * 1000);
+              }
           }
           return;
       }
@@ -221,12 +227,20 @@ module.exports = {
                   send: (form, callback) => api.sendMessage(form, event.threadId, callback),
                   reaction: (emoji, messageID, callback) => api.setMessageReaction(emoji, messageID || event.messageID, callback),
                   unsend: (messageID, callback) => api.unsendMessage(messageID || event.messageID, callback),
-                  err: (err) => {
+                  err: async (err) => {
                       const msg = typeof err === 'object' ? err.message || JSON.stringify(err) : String(err);
-                      return api.sendMessage(`❌ Error: ${msg}`, event.threadId);
+                      const sent = await api.sendMessage(`❌ Error: ${msg}`, event.threadId);
+                      if (config.AUTO_REMOVE_ERROR?.enable && sent?.messageID) {
+                          database.addAutoRemoveMessage(event.threadId, sent.messageID, (config.AUTO_REMOVE_ERROR.delay || 10) * 1000);
+                      }
+                      return sent;
                   },
-                  SyntaxError: () => {
-                      return api.sendMessage(`❌ Syntax Error!\nUse: ${prefix}help ${command.config.name} for usage instructions.`, event.threadId);
+                  SyntaxError: async () => {
+                      const sent = await api.sendMessage(`❌ Syntax Error!\nUse: ${prefix}help ${command.config.name} for usage instructions.`, event.threadId);
+                      if (config.AUTO_REMOVE_ERROR?.enable && sent?.messageID) {
+                          database.addAutoRemoveMessage(event.threadId, sent.messageID, (config.AUTO_REMOVE_ERROR.delay || 10) * 1000);
+                      }
+                      return sent;
                   }
               }
           };
@@ -241,7 +255,10 @@ module.exports = {
       } catch (e) {
           logger.error(`Command error: ${command.config.name}`, { error: e.message });
           Banner.commandExecuted(command.config.name, event.senderID, false);
-          await api.sendMessage(`❌ Error: ${e.message}`, event.threadId);
+          const sent = await api.sendMessage(`❌ Error: ${e.message}`, event.threadId);
+          if (config.AUTO_REMOVE_ERROR?.enable && sent?.messageID) {
+              database.addAutoRemoveMessage(event.threadId, sent.messageID, (config.AUTO_REMOVE_ERROR.delay || 10) * 1000);
+          }
       }
   },
 

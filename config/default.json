@@ -152,5 +152,9 @@
     "maxRequestsPerMinute": 50,
     "requestCooldownMs": 60000,
     "errorCacheTtlMs": 300000
+  },
+  "autoRemoveError": {
+    "enable": true,
+    "delay": 10
   }
 }
