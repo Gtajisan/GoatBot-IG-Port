@@ -1,9 +1,7 @@
 const axios = require('axios');
-const fs = require('fs-extra');
-const path = require('path');
 
 const cache = new Map();
-const CACHE_TTL = 5 * 60 * 1000;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 module.exports = {
   config: {
@@ -13,81 +11,113 @@ module.exports = {
     usage: 'pfp [username | @username | link | reply | @tag]',
     cooldown: 5,
     role: 0,
+    author: 'Gtajisan',
     category: 'utility'
   },
 
-  async onStart({ api, event, args, logger, database }) {
+  async run({ api, event, args, logger, message }) {
     try {
       let targetInput = null;
       let isUid = false;
 
+      // 1. Check explicit arguments
       if (args.length > 0) {
         const input = args[0].trim();
         if (input.includes('instagram.com/')) {
           const match = input.match(/instagram\.com\/([^/?#&]+)/);
           if (match) targetInput = match[1];
         } else {
+          // Normalize username: remove all leading @ symbols
           targetInput = input.replace(/^@+/, '');
         }
       }
+      // 2. Check mentions
       else if (event.mentions && Object.keys(event.mentions).length > 0) {
         targetInput = Object.keys(event.mentions)[0];
         isUid = true;
       }
+      // 3. Check reply
       else if (event.replyToItemId) {
-          // This would need message info from DB usually, but for now we try to get it from reply event if possible
-          // In this bot, we might not have the full reply object unless we fetched it
-          return api.sendMessage('❌ Reply parsing not fully supported yet. Please use username or tag.', event.threadId);
+        // For InstagramBot, event.messageReply is often populated if it's a direct reply
+        // If not, we might need to fetch it, but let's try the common patterns
+        const reply = event.messageReply || {};
+        const replyBody = reply.body || '';
+        const senderID = reply.senderID;
+
+        if (senderID) {
+          const urlMatch = replyBody.match(/instagram\.com\/([^/?#&]+)/);
+          if (urlMatch) {
+            targetInput = urlMatch[1];
+          } else {
+            const atMatch = replyBody.match(/@([a-zA-Z0-9._]+)/);
+            if (atMatch) {
+              targetInput = atMatch[1];
+            } else {
+              targetInput = senderID;
+              isUid = true;
+            }
+          }
+        }
       }
-      else {
+
+      // 4. Fallback to sender
+      if (!targetInput) {
         targetInput = event.senderID;
         isUid = true;
       }
 
-      if (!targetInput) return api.sendMessage('❌ Could not identify a user.', event.threadId);
-      if (!isUid && /^\d+$/.test(targetInput)) isUid = true;
+      if (!isUid && /^\d+$/.test(targetInput)) {
+        isUid = true;
+      }
 
+      // Check cache
       const cacheKey = `${isUid ? 'uid' : 'user'}:${targetInput}`;
       if (cache.has(cacheKey)) {
         const { data, timestamp } = cache.get(cacheKey);
         if (Date.now() - timestamp < CACHE_TTL) {
-          return this.sendProfile(api, event, data, logger);
+          return this.sendProfile(api, event, data, message, logger);
         }
       }
 
-      api.sendMessage('🔍 Fetching profile picture...', event.threadId);
+      const fetchingMsg = await message.reply('🔍 Fetching profile picture...');
 
-      let userInfo;
-      if (isUid) {
-          const infoObj = await api.getUserInfo(targetInput);
-          userInfo = infoObj[targetInput];
-      } else {
-          userInfo = await api.getUserInfoByUsername(targetInput);
-      }
+      const userInfo = await this.fetchWithRetry(async () => {
+        return isUid
+          ? (await api.getUserInfo(targetInput))[targetInput]
+          : await api.getUserInfoByUsername(targetInput);
+      }, logger);
 
       if (!userInfo) {
-        return api.sendMessage(`❌ User ${isUid ? targetInput : '@' + targetInput} not found or account is private.`, event.threadId);
+        return message.reply(`❌ User ${isUid ? targetInput : '@' + targetInput} not found or account is private.`);
       }
 
+      // Store in cache
       cache.set(cacheKey, { data: userInfo, timestamp: Date.now() });
-      return this.sendProfile(api, event, userInfo, logger);
+
+      return this.sendProfile(api, event, userInfo, message, logger);
 
     } catch (error) {
       logger.error('Error in pfp command', { error: error.message });
-      return api.sendMessage(`❌ Error: ${error.message}`, event.threadId);
+      return message.reply(`❌ Error: ${error.message}`);
     }
   },
 
-  async sendProfile(api, event, userInfo, logger) {
+  async sendProfile(api, event, userInfo, message, logger) {
     const userId = userInfo.userID || userInfo.userId || userInfo.pk;
     const username = userInfo.username;
     const fullName = userInfo.fullName || userInfo.full_name || 'N/A';
     const isPrivate = userInfo.isPrivate ? '🔒 Private' : '🔓 Public';
     const isVerified = userInfo.isVerified ? '✅ Verified' : '❌ Not Verified';
 
-    const pfpUrl = userInfo.profilePicUrlHd || userInfo.profile_pic_url_hd || userInfo.profile_pic_url;
+    const pfpUrl = userInfo.profilePicUrlHd ||
+                   userInfo.hd_profile_pic_url_info?.url ||
+                   userInfo.profile_pic_url_hd ||
+                   userInfo.profilePicUrl ||
+                   userInfo.profile_pic_url;
 
-    if (!pfpUrl) return api.sendMessage('❌ Could not find a profile picture URL.', event.threadId);
+    if (!pfpUrl) {
+      return message.reply('❌ Could not find a profile picture URL.');
+    }
 
     let caption = `👤 Username: @${username}\n`;
     caption += `📝 Full Name: ${fullName}\n`;
@@ -96,9 +126,29 @@ module.exports = {
     caption += `🔗 Profile: https://instagram.com/${username}`;
 
     try {
-        await api.sendMessage({ body: caption, attachment: pfpUrl }, event.threadId);
+      await message.reply({ body: caption, attachment: pfpUrl });
     } catch (error) {
-        api.sendMessage(`${caption}\n\n🖼️ PFP URL: ${pfpUrl}`, event.threadId);
+      logger.error('Failed to send profile picture as attachment', { error: error.message });
+      await message.reply(`${caption}\n\n🖼️ PFP URL: ${pfpUrl}`);
+    }
+  },
+
+  async fetchWithRetry(fn, logger, retries = 3, backoff = 1000) {
+    for (let i = 0; i < retries; i++) {
+      try {
+        return await fn();
+      } catch (error) {
+        const errorMsg = error.message.toLowerCase();
+        const isRateLimit = errorMsg.includes('rate limit') || errorMsg.includes('429') || errorMsg.includes('too many requests') || errorMsg.includes('login_required');
+
+        if (isRateLimit && i < retries - 1) {
+          const delay = backoff * Math.pow(2, i);
+          logger.warn(`Rate limit or session issue hit fetching profile, retrying in ${delay}ms... (Attempt ${i+1}/${retries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        throw error;
+      }
     }
   }
 };

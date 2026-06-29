@@ -1,18 +1,61 @@
 module.exports = {
-  config: { name: 'uid', aliases: ['userid', 'id'], description: 'Get your UID or resolve a username', usage: 'uid [username]', cooldown: 5, role: 0, category: 'utility' },
-  async run({ api, event, args, logger }) {
-    if (args.length === 0) return api.sendMessage(String(event.senderID), event.threadId);
-    const input = args[0].replace('@', '').trim();
-    if (/^\d+$/.test(input)) return api.sendMessage(input, event.threadId);
+  config: {
+    name: 'uid',
+    aliases: ['userid', 'getuid', 'id'],
+    description: 'Get Instagram User ID from username',
+    usage: 'uid [username | @username | reply | @tag]',
+    cooldown: 5,
+    role: 0,
+    author: 'Gtajisan',
+    category: 'utility'
+  },
+
+  async run({ api, event, args, logger, message }) {
     try {
-      const info = await api.getUserInfoByUsername(input);
-      if (!info) return api.sendMessage(`❌ User @${input} not found!`, event.threadId);
-      const uid = info.userID || info.userId;
-      if (!uid) return api.sendMessage(`❌ Could not resolve UID for @${input}.`, event.threadId);
-      return api.sendMessage(String(uid), event.threadId);
-    } catch (e) {
-      logger.error('Error in uid', { error: e.message });
-      return api.sendMessage(`❌ Error fetching UID for @${input}`, event.threadId);
+      let targetInput = null;
+      let isUid = false;
+
+      if (args.length > 0) {
+        targetInput = args[0].replace(/^@+/, '').trim();
+      } else if (event.mentions && Object.keys(event.mentions).length > 0) {
+        targetInput = Object.keys(event.mentions)[0];
+        isUid = true;
+      } else if (event.replyToItemId) {
+        const reply = event.messageReply || {};
+        if (reply.senderID) {
+          targetInput = reply.senderID;
+          isUid = true;
+        }
+      }
+
+      if (!targetInput) {
+        targetInput = event.senderID;
+        isUid = true;
+      }
+
+      if (!isUid && /^\d+$/.test(targetInput)) {
+        isUid = true;
+      }
+
+      if (isUid) {
+        return message.reply(String(targetInput));
+      }
+
+      const userInfo = await api.getUserInfoByUsername(targetInput);
+      if (!userInfo) {
+        return message.reply(`❌ User @${targetInput} not found!`);
+      }
+
+      const userId = userInfo.userID || userInfo.userId || userInfo.pk;
+      if (!userId) {
+        return message.reply(`❌ Could not resolve User ID for @${targetInput}.`);
+      }
+
+      return message.reply(String(userId));
+
+    } catch (error) {
+      logger.error('Error in uid command', { error: error.message });
+      return message.reply(`❌ Error: ${error.message}`);
     }
   }
 };
