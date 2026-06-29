@@ -3,7 +3,7 @@ const moment = require("moment-timezone");
 module.exports = {
   config: {
     name: "dih",
-    version: "1.3.0",
+    version: "1.3.2",
     author: "Jules (Ported)",
     cooldown: 5,
     role: 0,
@@ -71,13 +71,15 @@ module.exports = {
 
       const allUsers = await usersData.getAll();
       const threadData = await threadsData.get(threadID);
-      const memberIDs = threadData.members.map(m => String(m.userID));
+      const members = threadData.members || [];
+      const memberIDs = members.map(m => String(m.userID));
 
       const topDihs = allUsers
         .filter(u => memberIDs.includes(String(u.userID)) && u.data?.dih?.length !== undefined)
         .sort((a, b) => b.data.dih.length - a.data.dih.length);
 
-      const rank = topDihs.findIndex(u => String(u.userID) === String(senderID)) + 1;
+      let rank = topDihs.findIndex(u => String(u.userID) === String(senderID)) + 1;
+      if (rank === 0 && memberIDs.length === 0) rank = 1; // Fallback for private chats or empty member list
 
       let msg = "";
       if (growth > 0) {
@@ -95,7 +97,8 @@ module.exports = {
     } else if (command === "top") {
       const allUsers = await usersData.getAll();
       const threadData = await threadsData.get(threadID);
-      const memberIDs = threadData.members.map(m => String(m.userID));
+      const members = threadData.members || [];
+      const memberIDs = members.map(m => String(m.userID));
 
       const topDihs = allUsers
         .filter(u => memberIDs.includes(String(u.userID)) && u.data?.dih?.length !== undefined)
@@ -120,22 +123,18 @@ module.exports = {
     } else if (command === "attack") {
       let targetID;
 
-      // 1. Reply
       if (event.messageReply) {
         targetID = event.messageReply.senderID;
       }
-      // 2. Mentions
       else if (event.mentions && Object.keys(event.mentions).length > 0) {
         const mentions = Object.keys(event.mentions);
         targetID = mentions.find(id => id !== senderID) || mentions[0];
       }
-      // 3. Arguments (ID or Username lookup)
       else {
         const potentialID = args.find((a, i) => /^\d+$/.test(a) && (i > 0 || nameMap[commandName]));
         if (potentialID) {
             targetID = potentialID;
         } else {
-            // Try resolving username from the last argument
             const lastArg = args[args.length - 1];
             if (lastArg && lastArg.startsWith("@")) {
                 const username = lastArg.replace("@", "");
@@ -166,7 +165,6 @@ module.exports = {
         return message.reply("You need a positive dih length to attack someone!");
       }
 
-      // Bet logic
       let bet = 0;
       const potentialBet = args.find(a => /^\d+$/.test(a) && a !== String(targetID));
       if (potentialBet) bet = parseInt(potentialBet);
@@ -207,7 +205,6 @@ module.exports = {
         return message.reply(`⚔️ Defeat! ${targetData.name || "Unknown"} was too strong and took ${stolen} cm from your dih. Your dih 🍆 is now ${userData.data.dih.length} cm.`);
       }
 
-    // Subcommand: LOAN
     } else if (command === "loan") {
       if (userData.data.dih.length >= 0) {
         return message.reply("You don't need a loan! Your dih 🍆 is doing just fine.");
@@ -216,11 +213,9 @@ module.exports = {
       await usersData.set(senderID, { data: userData.data });
       return message.reply("🏦 Your debt has been cleared. Your dih 🍆 is now back to 0 cm.");
 
-    // Subcommand: IMPORT (Placeholder)
     } else if (command === "import") {
         return message.reply("📦 Import functionality is currently in development. We are working on supporting imports from other bots! Summing lengths will be supported.");
 
-    // Subcommand: STATS
     } else if (command === "stats") {
       const stats = userData.data.dih;
       const winRate = stats.stats.totalAttacks > 0 ? ((stats.stats.wins / stats.stats.totalAttacks) * 100).toFixed(1) : 0;
@@ -234,7 +229,6 @@ module.exports = {
 
       return message.reply(statsMsg);
 
-    // Subcommand: DOTD
     } else if (command === "dotd") {
       const tz = config.TIMEZONE || "Asia/Dhaka";
       const today = moment.tz(tz).format("DD/MM/YYYY");
@@ -253,7 +247,7 @@ module.exports = {
         .filter(u => u.data?.dih?.lastGrowth > oneWeekAgo)
         .map(u => String(u.userID));
 
-      const members = threadData.members.filter(m => m.inGroup && activeMemberIDs.includes(String(m.userID)));
+      const members = (threadData.members || []).filter(m => m.inGroup && activeMemberIDs.includes(String(m.userID)));
 
       if (members.length === 0) return message.reply("No active players (who grew their dih in the last week) found for Dih of the Day!");
 
