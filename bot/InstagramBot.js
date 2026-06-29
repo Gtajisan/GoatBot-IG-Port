@@ -27,6 +27,7 @@ class InstagramBot {
     this._mqttRestartTimer  = null;
     this._cookieRefreshTimer = null;
     this._reminderTimer     = null;
+    this._autoRemoveTimer   = null;
   }
 
   startHealthServer() {
@@ -328,6 +329,7 @@ class InstagramBot {
     this.eventLoader.handleEvent('ready', {}).then(() => {
       this.startListening();
       this._startReminderScheduler();
+      this._startAutoRemoveScheduler();
     });
   }
 
@@ -976,6 +978,29 @@ class InstagramBot {
     logger.info('Reminder scheduler started (checks every 30s)');
   }
 
+
+  _startAutoRemoveScheduler() {
+    if (this._autoRemoveTimer) clearInterval(this._autoRemoveTimer);
+    if (!config.AUTO_REMOVE_ERROR?.enable) return;
+
+    this._autoRemoveTimer = setInterval(async () => {
+      try {
+        const database = require('../utils/database');
+        const expired = database.getExpiredAutoRemoveMessages();
+        for (const msg of expired) {
+          try {
+            await this.api.unsendMessage(msg.messageId);
+          } catch (err) {
+            // Ignore errors (message might already be unsent or permission issue)
+          }
+        }
+      } catch (err) {
+        logger.error('Auto-remove scheduler error', { error: err.message });
+      }
+    }, 5000); // Check every 5 seconds
+    logger.info('Auto-remove scheduler started (checks every 5s)');
+  }
+
   _scheduleAutoRestart() {
     const time = config.AUTO_RESTART_TIME;
     if (!time) return;
@@ -1075,6 +1100,7 @@ class InstagramBot {
       if (this._mqttRestartTimer)   clearInterval(this._mqttRestartTimer);
       if (this._cookieRefreshTimer) clearInterval(this._cookieRefreshTimer);
       if (this._reminderTimer)      clearInterval(this._reminderTimer);
+      if (this._autoRemoveTimer)    clearInterval(this._autoRemoveTimer);
       try { if (this.ig) this.ig.stopListening(); } catch (_) {}
       logger.info('Bot shutdown complete');
       process.exit(0);

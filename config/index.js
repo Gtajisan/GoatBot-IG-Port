@@ -131,6 +131,8 @@ module.exports = {
   LOGGING:     c.logging || { logLevel: 'info', logToFile: true, webhookUrl: '' },
   AI_FALLBACK: c.AI_FALLBACK || { enable: false, command: 'gpt' },
 
+  AUTO_REMOVE_ERROR: c.autoRemoveError || { enable: true, delay: 10 },
+
   OPTIONS_FCA: (() => {
     const o = c.optionsFca || {};
     const clean = {};

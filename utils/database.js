@@ -115,7 +115,8 @@ class Database {
       reminders: [], autoResponses: [],
       welcomedUsers: new Set(), bannedUsers: new Set(),
       spamWarnings: {}, lastMessages: {}, sentMessages: {}, processedMessages: {},
-      replyHandlers: {}, reactionHandlers: {}
+      replyHandlers: {}, reactionHandlers: {},
+      autoRemoveMessages: []
     };
   }
 
@@ -127,7 +128,8 @@ class Database {
       welcomedUsers: new Set(d.welcomedUsers || []), bannedUsers: new Set(d.bannedUsers || []),
       spamWarnings: d.spamWarnings || {}, lastMessages: d.lastMessages || {},
       sentMessages: d.sentMessages || {}, processedMessages: d.processedMessages || {},
-      replyHandlers: d.replyHandlers || {}, reactionHandlers: d.reactionHandlers || {}
+      replyHandlers: d.replyHandlers || {}, reactionHandlers: d.reactionHandlers || {},
+      autoRemoveMessages: d.autoRemoveMessages || []
     };
   }
 
@@ -362,6 +364,18 @@ class Database {
 
   getReactionData(messageID) {
     return this.data.reactionHandlers[String(messageID)] || null;
+  }
+
+  addAutoRemoveMessage(threadId, messageId, delayMs) {
+    const triggerTime = Date.now() + delayMs;
+    this.data.autoRemoveMessages.push({ threadId, messageId, triggerTime });
+  }
+
+  getExpiredAutoRemoveMessages() {
+    const now = Date.now();
+    const expired = this.data.autoRemoveMessages.filter(m => m.triggerTime <= now);
+    this.data.autoRemoveMessages = this.data.autoRemoveMessages.filter(m => m.triggerTime > now);
+    return expired;
   }
 }
 
