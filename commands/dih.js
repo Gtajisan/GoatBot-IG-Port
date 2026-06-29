@@ -3,7 +3,7 @@ const moment = require("moment-timezone");
 module.exports = {
   config: {
     name: "dih",
-    version: "1.2.1",
+    version: "1.3.0",
     author: "Jules (Ported)",
     cooldown: 5,
     role: 0,
@@ -30,7 +30,7 @@ module.exports = {
       command = nameMap[commandName];
     } else if (args[0]) {
       const sub = args[0].toLowerCase();
-      const validSubs = ["grow", "top", "leaderboard", "attack", "battle", "fight", "pvp", "stats", "dotd", "loan"];
+      const validSubs = ["grow", "top", "leaderboard", "attack", "battle", "fight", "pvp", "stats", "dotd", "loan", "import"];
       if (validSubs.includes(sub)) {
         command = sub;
         if (["leaderboard"].includes(command)) command = "top";
@@ -104,8 +104,7 @@ module.exports = {
       if (topDihs.length === 0) return message.reply("No one has grown a dih in this thread yet!");
 
       let leaderboardMsg = "🏆 Dih Leaderboard\n\n";
-      // Show up to Top 50 to avoid message length limits
-      const displayCount = Math.min(topDihs.length, 50);
+      const displayCount = Math.min(topDihs.length, 100);
       for (let i = 0; i < displayCount; i++) {
         const u = topDihs[i];
         const name = u.name || "Unknown";
@@ -121,26 +120,44 @@ module.exports = {
     } else if (command === "attack") {
       let targetID;
 
-      // Priority 1: Mentions
-      if (event.mentions && Object.keys(event.mentions).length > 0) {
+      // 1. Reply
+      if (event.messageReply) {
+        targetID = event.messageReply.senderID;
+      }
+      // 2. Mentions
+      else if (event.mentions && Object.keys(event.mentions).length > 0) {
         const mentions = Object.keys(event.mentions);
         targetID = mentions.find(id => id !== senderID) || mentions[0];
       }
-      // Priority 2: Message Reply
-      else if (event.messageReply) {
-        targetID = event.messageReply.senderID;
-      }
-      // Priority 3: Numeric Arg (ID)
+      // 3. Arguments (ID or Username lookup)
       else {
-        const numericArg = args.find((a, i) => /^\d+$/.test(a) && (i > 0 || nameMap[commandName]));
-        if (numericArg) targetID = numericArg;
+        const potentialID = args.find((a, i) => /^\d+$/.test(a) && (i > 0 || nameMap[commandName]));
+        if (potentialID) {
+            targetID = potentialID;
+        } else {
+            // Try resolving username from the last argument
+            const lastArg = args[args.length - 1];
+            if (lastArg && lastArg.startsWith("@")) {
+                const username = lastArg.replace("@", "");
+                try {
+                    const info = await api.getUserInfoByUsername(username);
+                    if (info) targetID = info.userID || info.userId;
+                } catch (e) {}
+            }
+        }
       }
 
-      if (!targetID || targetID === senderID) {
+      if (!targetID || String(targetID) === String(senderID)) {
         return message.reply("Please mention or reply to someone to attack!");
       }
 
-      const targetData = await usersData.get(targetID);
+      let targetData;
+      try {
+        targetData = await usersData.get(targetID);
+      } catch (e) {
+        return message.reply("❌ Could not fetch user data. They might not be in the database yet!");
+      }
+
       if (!targetData || !targetData.data?.dih) {
         return message.reply("This user doesn't have a dih yet!");
       }
@@ -151,7 +168,7 @@ module.exports = {
 
       // Bet logic
       let bet = 0;
-      const potentialBet = args.find(a => /^\d+$/.test(a) && a !== targetID);
+      const potentialBet = args.find(a => /^\d+$/.test(a) && a !== String(targetID));
       if (potentialBet) bet = parseInt(potentialBet);
 
       if (bet > 0) {
@@ -198,6 +215,10 @@ module.exports = {
       userData.data.dih.length = 0;
       await usersData.set(senderID, { data: userData.data });
       return message.reply("🏦 Your debt has been cleared. Your dih 🍆 is now back to 0 cm.");
+
+    // Subcommand: IMPORT (Placeholder)
+    } else if (command === "import") {
+        return message.reply("📦 Import functionality is currently in development. We are working on supporting imports from other bots! Summing lengths will be supported.");
 
     // Subcommand: STATS
     } else if (command === "stats") {
@@ -254,7 +275,7 @@ module.exports = {
       return message.reply(`🎉 Congratulations ${luckyUserData.name || "Unknown"}! Your dih was chosen as the Dih of the Day!\n\n🎁 You received a bonus of ${bonus} cm! Current length: ${luckyUserData.data.dih.length} cm.`);
 
     } else {
-      return message.reply("Invalid subcommand! Use: grow, top, attack, stats, dotd, loan");
+      return message.reply("Invalid subcommand! Use: grow, top, attack, stats, dotd, loan, import");
     }
   }
 };
