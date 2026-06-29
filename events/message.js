@@ -221,9 +221,17 @@ module.exports = {
                   send: (form, callback) => api.sendMessage(form, event.threadId, callback),
                   reaction: (emoji, messageID, callback) => api.setMessageReaction(emoji, messageID || event.messageID, callback),
                   unsend: (messageID, callback) => api.unsendMessage(messageID || event.messageID, callback),
-                  err: (err) => {
+                  err: async (err) => {
                       const msg = typeof err === 'object' ? err.message || JSON.stringify(err) : String(err);
-                      return api.sendMessage(`❌ Error: ${msg}`, event.threadId);
+                      const errorTemplate = `⚠️ [ COMMAND ERROR ]\n━━━━━━━━━━━━━━━━\n🚀 Command: ${command.config.name}\n📝 Error: ${msg}\n━━━━━━━━━━━━━━━━\n💡 This message will be auto-deleted in 20s.`;
+
+                      const result = await api.sendMessage(errorTemplate, event.threadId);
+                      if (result && (result.messageID || result.messageId)) {
+                          setTimeout(() => {
+                              api.unsendMessage(result.messageID || result.messageId).catch(() => {});
+                          }, 20000);
+                      }
+                      return result;
                   },
                   SyntaxError: () => {
                       return api.sendMessage(`❌ Syntax Error!\nUse: ${prefix}help ${command.config.name} for usage instructions.`, event.threadId);
@@ -241,7 +249,22 @@ module.exports = {
       } catch (e) {
           logger.error(`Command error: ${command.config.name}`, { error: e.message });
           Banner.commandExecuted(command.config.name, event.senderID, false);
-          await api.sendMessage(`❌ Error: ${e.message}`, event.threadId);
+
+          const errorTemplate = `❌ [ SYSTEM ERROR ]\n━━━━━━━━━━━━━━━━\n🚀 Command: ${command.config.name}\n📝 Error: ${e.message}\n👤 User: ${event.senderID}\n━━━━━━━━━━━━━━━━\n💡 This notification is automated and will be removed shortly.`;
+
+          const result = await api.sendMessage(errorTemplate, event.threadId);
+          if (result && (result.messageID || result.messageId)) {
+              setTimeout(() => {
+                  api.unsendMessage(result.messageID || result.messageId).catch(() => {});
+              }, 20000);
+          }
+
+          // Also notify Admins if configured
+          if (config.NOTI_ERROR_TO_ADMIN !== false) {
+              for (const adminID of config.ADMIN_BOT) {
+                  api.sendMessage(`🚨 Bot Alert!\nCommand "${command.config.name}" failed in thread ${event.threadId}.\nError: ${e.message}`, adminID).catch(() => {});
+              }
+          }
       }
   },
 

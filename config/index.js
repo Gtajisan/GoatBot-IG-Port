@@ -130,6 +130,7 @@ module.exports = {
   HUMAN_DELAY: c.humanDelay || { min: 500, max: 2000 },
   LOGGING:     c.logging || { logLevel: 'info', logToFile: true, webhookUrl: '' },
   AI_FALLBACK: c.AI_FALLBACK || { enable: false, command: 'gpt' },
+  ERROR_REPORTING: c.errorReporting || { autoUnsend: true, unsendDelay: 20000, notiAdmin: true },
 
   OPTIONS_FCA: (() => {
     const o = c.optionsFca || {};

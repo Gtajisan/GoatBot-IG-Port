@@ -133,6 +133,11 @@
     "enable": false,
     "command": "gpt"
   },
+  "errorReporting": {
+    "autoUnsend": true,
+    "unsendDelay": 20000,
+    "notiAdmin": true
+  },
   "optionsFca": {
     "online": true,
     "selfListen": true,
