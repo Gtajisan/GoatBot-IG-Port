@@ -77,8 +77,8 @@
     "ignoreEvents": ""
   },
   "autoRefreshFbstate": true,
-  "autoReloginWhenChangeAccount": false,
-  "autoRestartWhenListenMqttError": false,
+  "autoReloginWhenChangeAccount": true,
+  "autoRestartWhenListenMqttError": true,
   "restartListenMqtt": {
     "enable": true,
     "timeRestart": 3600000,
@@ -118,11 +118,11 @@
   },
   "typingIndicator": {
     "enable": true,
-    "duration": 500
+    "duration": 1500
   },
   "humanDelay": {
-    "min": 500,
-    "max": 2000
+    "min": 1500,
+    "max": 4000
   },
   "logging": {
     "logLevel": "info",

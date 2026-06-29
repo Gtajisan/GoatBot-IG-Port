@@ -266,11 +266,28 @@ class InstagramBot {
   }
 
   _hasValidCookies(content) {
+    try {
+      const trimmed = content.trim();
+      if (trimmed.startsWith('{') || trimmed.startsWith('[')) return true;
+    } catch (_) {}
     return content.split('\n').some(line => {
       const t = line.trim();
       if (!t || (t.startsWith('#') && !t.startsWith('#HttpOnly'))) return false;
       return t.includes('sessionid');
     });
+  }
+
+  saveSession() {
+    try {
+      if (!this.ig || typeof this.ig.getSession !== 'function') return;
+      const session = this.ig.getSession();
+      if (session) {
+        fs.writeFileSync(config.ACCOUNT_FILE, JSON.stringify(session, null, 2), 'utf-8');
+        logger.info('Session state saved', { file: config.ACCOUNT_FILE });
+      }
+    } catch (e) {
+      logger.error('Failed to save session', { error: e.message });
+    }
   }
 
   _afterLogin() {
@@ -325,6 +342,7 @@ class InstagramBot {
     this.reconnectAttempts = 0;
     this.isRunning         = true;
     logger.info('Connected to Instagram', { userID: this.userID });
+    this.saveSession();
 
     this.eventLoader.handleEvent('ready', {}).then(() => {
       this.startListening();
@@ -649,6 +667,10 @@ class InstagramBot {
           return result;
         } catch (error) {
           logger.error('Failed to send message', { error: error.message, threadID });
+          if (/login_required|not authorized|unauthorized/i.test(error.message)) {
+            logger.warn('Auth error detected during sendMessage, triggering reconnection...');
+            this.scheduleReconnect();
+          }
           if (typeof callback === 'function') callback(error);
           throw error;
         }
@@ -714,6 +736,10 @@ class InstagramBot {
           return await ig.sendPhoto(threadID, photoPath, {});
         } catch (error) {
           logger.error('Failed to send photo', { error: error.message, threadID });
+          if (/login_required|not authorized|unauthorized/i.test(error.message)) {
+            logger.warn('Auth error detected during sendPhoto, triggering reconnection...');
+            this.scheduleReconnect();
+          }
           throw error;
         }
       },
@@ -728,6 +754,10 @@ class InstagramBot {
           return await ig.sendVideo(threadID, videoPath, {});
         } catch (error) {
           logger.error('Failed to send video', { error: error.message, threadID });
+          if (/login_required|not authorized|unauthorized/i.test(error.message)) {
+            logger.warn('Auth error detected during sendVideo, triggering reconnection...');
+            this.scheduleReconnect();
+          }
           throw error;
         }
       },
@@ -742,6 +772,10 @@ class InstagramBot {
           return await ig.sendVoice(threadID, audioPath, {});
         } catch (error) {
           logger.error('Failed to send audio', { error: error.message, threadID });
+          if (/login_required|not authorized|unauthorized/i.test(error.message)) {
+            logger.warn('Auth error detected during sendAudio, triggering reconnection...');
+            this.scheduleReconnect();
+          }
           throw error;
         }
       },
@@ -1047,6 +1081,7 @@ class InstagramBot {
           password: config.ACCOUNT_PASSWORD
         });
         this._afterLogin();
+        this.saveSession();
         logger.info('Cookie refresh successful.');
       } catch (err) {
         logger.error('Cookie refresh failed.', { error: err.message });
