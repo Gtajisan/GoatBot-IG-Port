@@ -1,11 +1,14 @@
 const log = require('./log.js');
 
+/**
+ * Legacy loading logger for backward compatibility
+ */
 module.exports = {
-    err: (prefix, message) => log.error(prefix, message),
-    error: (prefix, message) => log.error(prefix, message),
-    warn: (prefix, message) => log.warn(prefix, message),
-    info: (prefix, message) => log.info(prefix, message),
-    succes: (prefix, message) => log.success(prefix, message),
-    success: (prefix, message) => log.success(prefix, message),
-    master: (prefix, message) => log.master(prefix, message)
+    err: (...args) => log.error('LOAD', ...args),
+    error: (...args) => log.error('LOAD', ...args),
+    warn: (...args) => log.warn('LOAD', ...args),
+    info: (...args) => log.info('LOAD', ...args),
+    succes: (...args) => log.success('LOAD', ...args),
+    success: (...args) => log.success('LOAD', ...args),
+    master: (...args) => log.master(...args)
 };

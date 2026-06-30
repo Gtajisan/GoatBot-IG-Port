@@ -49,8 +49,22 @@ function formatAndLog(level, args) {
     }
 
     // Apply simplification to message and meta properties
-    const processedMessage = simplifyObject(message);
-    if (meta.error) meta.error = simplifyObject(meta.error);
+    let processedMessage = simplifyObject(message);
+
+    // Special handling for Error objects in message
+    if (processedMessage instanceof Error) {
+        meta.stack = processedMessage.stack;
+        processedMessage = processedMessage.message;
+    }
+
+    if (meta.error) {
+        if (meta.error instanceof Error) {
+            meta.stack = meta.error.stack;
+            meta.error = meta.error.message;
+        } else {
+            meta.error = simplifyObject(meta.error);
+        }
+    }
     if (meta.reason) meta.reason = simplifyObject(meta.reason);
     if (meta.details) {
         if (Array.isArray(meta.details)) meta.details = meta.details.map(simplifyObject);
