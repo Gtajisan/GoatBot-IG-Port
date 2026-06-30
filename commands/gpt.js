@@ -1,30 +1,32 @@
-const axios = require('axios');
+const axios = require("axios");
 
 module.exports = {
   config: {
-    name: 'gpt',
-    aliases: ['ai', 'ask'],
-    description: 'Chat with AI powered by GPT-4',
-    usage: 'gpt <message>',
-    role: 0,
+    name: "gpt",
+    aliases: ["ai", "chatgpt"],
+    version: "1.0",
+    author: "NTKhang",
     cooldown: 5,
-    category: 'ai'
+    role: 0,
+    description: "Chat with GPT AI",
+    category: "ai",
+    usage: "{pn} <question>"
   },
 
-  async onStart({ api, event, args, message }) {
-    const prompt = args.join(' ');
-    if (!prompt) return message.reply('Please provide a prompt.');
+  async onStart({ message, args, event, api }) {
+    const prompt = args.join(" ");
+    if (!prompt) return message.reply("Please provide a question.");
 
     try {
-      message.reaction('⏳');
-      const response = await axios.get(`https://api.jisan-official.com/gpt4?prompt=${encodeURIComponent(prompt)}`);
-      const answer = response.data.response || response.data.answer || "No response from AI.";
+      api.setMessageReaction("⏳", event.messageID);
+      const res = await axios.get(`https://api.kenliejugar.net/gptgo/?text=${encodeURIComponent(prompt)}`);
+      const answer = res.data.response || "No response from AI.";
 
-      message.reply(answer);
-      message.reaction('✅');
-    } catch (error) {
-      console.error('GPT Error:', error.message);
-      message.reply('An error occurred while connecting to AI service.');
+      api.setMessageReaction("✅", event.messageID);
+      return message.reply(answer);
+    } catch (e) {
+      api.setMessageReaction("❌", event.messageID);
+      return message.reply("❌ Error connecting to AI service.");
     }
   }
 };

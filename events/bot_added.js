@@ -1,17 +1,13 @@
-const logger = require('../utils/logger');
-const config = require('../config');
-
 module.exports = {
-  config: { name: 'bot_added', description: 'Introduction when bot is added to a group' },
-  async run(bot, data) {
-    try {
-      const { api } = bot;
-      const { threadID, addedBy } = data;
-      logger.info(`Bot added to thread: ${threadID} by ${addedBy}`);
-      await api.sendMessage(
-        `👋 Hello! I'm ${config.NICK_NAME_BOT}.\n\nThanks for adding me!\n\n📌 Prefix: ${config.PREFIX}\n💡 Type ${config.PREFIX}help to see all commands. 🚀`,
-        threadID
-      );
-    } catch (e) { logger.error('Error in bot_added event', { error: e.message }); }
+  config: {
+    name: "bot_added",
+    description: "Fired when bot is added to a group"
+  },
+  async run({ api, event, bot, threadsData }) {
+    if (event.type === 'event' && event.eventType === 'subscribe' && event.addedParticipants.some(p => p.userID == api.getCurrentUserID())) {
+      const threadID = event.threadID;
+      const prefix = bot.config.PREFIX;
+      await api.sendMessage(`Hello! I'm ${bot.config.NICK_NAME_BOT}. Type ${prefix}help to see my commands.`, threadID);
+    }
   }
 };

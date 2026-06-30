@@ -42,7 +42,7 @@
     "autoSyncWhenStart": false,
     "autoRefreshThreadInfoFirstTime": true
   },
-  "messageDelayMs": 100,
+  "messageDelayMs": 100, "experimentalFca": { "enable": false }, "useFcaFallback": { "text": false, "image": false, "video": false, "audio": false },
   "timeZone": "Asia/Dhaka",
   "dashBoard": {
     "enable": true,

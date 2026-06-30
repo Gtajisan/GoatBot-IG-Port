@@ -1,69 +1,49 @@
-const axios = require("axios");
-
-const noobcore = "https://raw.githubusercontent.com/noobcore404/NC-STORE/main/NCApiUrl.json";
-
-async function getRenzApi() {
-  const res = await axios.get(noobcore, { timeout: 10000 });
-  if (!res.data?.renz) throw new Error("Renz API not found in JSON");
-  return res.data.renz;
-}
+const axios = require('axios');
 
 module.exports = {
   config: {
-    name: "edit",
-    aliases: ["nanobanana", "gptimage"],
-    version: "1.2",
-    author: "Gtajisan",
+    name: "nbpro",
+    aliases: ["edit", "nb", "nanobanana"],
+    version: "1.0",
+    author: "Tawsif~",
     cooldown: 5,
     role: 0,
-    description: "Generate or edit images using text prompts",
-    category: "image",
-    usage: "{pn} <prompt> | Reply to an image with your prompt"
+    description: "Edit & generate images using Nano-banana Pro",
+    category: "ai",
+    usage: "<prompt> | reply to image"
   },
 
-  onStart: async function ({ api, event, args, message, logger }) {
-    const prompt = args.join(" ").trim();
-    if (!prompt) {
-      return message.reply(
-        "❌ Please provide a prompt.\n\nExamples:\n!edit a cyberpunk city\n!edit make me anime (reply to an image)"
-      );
+  async onStart({ message, event, args, api }) {
+    let prompt = args.join(" ");
+    if (!event.messageReply && !prompt) {
+      return message.reply('Please provide a prompt or reply to an image.');
     }
 
-    message.reaction("⏳");
-
     try {
-      const BASE_URL = await getRenzApi();
-      let apiURL = `${BASE_URL}/api/gptimage?prompt=${encodeURIComponent(prompt)}`;
+      api.setMessageReaction("⏳", event.messageID);
 
-      const reply = event.messageReply;
-      let hasImageReply = false;
-      if (reply && Array.isArray(reply.attachments) && reply.attachments.length > 0) {
-        const photo = reply.attachments.find(a => a.type === "photo" || a.type === "image");
-        if (photo) {
-          hasImageReply = true;
-          apiURL += `&ref=${encodeURIComponent(photo.url)}`;
-          if (photo.width && photo.height) {
-            apiURL += `&width=${photo.width}&height=${photo.height}`;
-          }
-        }
+      if (!event.messageReply) {
+        // Generation mode
+        let ratio = prompt.includes("--ar=") ? prompt.split("--ar=")[1].split(" ")[0] : '1:1';
+        const res = await axios.get(`https://tawsif.is-a.dev/gemini/nano-banana-pro-gen?prompt=${encodeURIComponent(prompt)}&ratio=${ratio}`);
+        return message.reply({
+          body: "✅ Generated",
+          attachment: res.data.imageUrl
+        });
+      } else {
+        // Edit mode
+        let imgs = event.messageReply.attachments.filter(a => a.type === 'photo').map(a => a.url);
+        if (imgs.length === 0) return message.reply("Please reply to an image.");
+
+        const res = await axios.get(`https://tawsif.is-a.dev/gemini/nano-banana-pro-edit?prompt=${encodeURIComponent(prompt)}&urls=${encodeURIComponent(JSON.stringify(imgs))}`);
+        return message.reply({
+          body: "✅ Image Edited",
+          attachment: res.data.imageUrl
+        });
       }
-
-      if (!hasImageReply) {
-        apiURL += `&width=512&height=512`;
-      }
-
-      await message.reply({
-        body: hasImageReply
-          ? `🖌 Image edited successfully.\nPrompt: ${prompt}\n\n(Tap to hold to save/view image)`
-          : `🖼 Image generated successfully.\nPrompt: ${prompt}\n\n(Tap to hold to save/view image)`,
-        attachment: apiURL
-      });
-
-      message.reaction("✅");
-    } catch (err) {
-      logger.error("EDIT Command Error:", err?.response?.data || err.message);
-      message.reaction("❌");
-      message.reply("❌ Failed to process image. Please try again later.");
+    } catch (e) {
+      api.setMessageReaction("❌", event.messageID);
+      return message.reply(`❌ Error: ${e.message}`);
     }
   }
 };
