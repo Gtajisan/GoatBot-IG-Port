@@ -192,11 +192,10 @@ class InstagramBot {
   }
 
   async start() {
+      this.startHealthServer();
     try {
       Banner.display();
       logger.info('Starting Instagram Bot...');
-
-      this.startHealthServer();
 
       const database = require('../utils/database');
       await database.ready;

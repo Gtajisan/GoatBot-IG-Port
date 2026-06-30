@@ -1,6 +1,28 @@
 const logger = require('./index.js');
 
 /**
+ * Simplifies large objects like Axios errors to prevent log pollution
+ */
+function simplifyObject(obj) {
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj;
+
+    // Check if it's an Axios error or similar large request error
+    if (obj.isAxiosError || obj.config || obj.response) {
+        return {
+            message: obj.message,
+            code: obj.code,
+            status: obj.response?.status,
+            method: obj.config?.method?.toUpperCase(),
+            url: obj.config?.url,
+            data: typeof obj.response?.data === 'string'
+                ? (obj.response.data.length > 500 ? obj.response.data.slice(0, 500) + '...' : obj.response.data)
+                : (typeof obj.response?.data === 'object' ? '[Object]' : obj.response?.data)
+        };
+    }
+    return obj;
+}
+
+/**
  * Enhanced formatAndLog function to handle various argument styles
  * @param {string} level The log level (info, success, warn, error, debug)
  * @param {Array} args The arguments passed to the log function
@@ -26,10 +48,19 @@ function formatAndLog(level, args) {
         }
     }
 
+    // Apply simplification to message and meta properties
+    const processedMessage = simplifyObject(message);
+    if (meta.error) meta.error = simplifyObject(meta.error);
+    if (meta.reason) meta.reason = simplifyObject(meta.reason);
+    if (meta.details) {
+        if (Array.isArray(meta.details)) meta.details = meta.details.map(simplifyObject);
+        else meta.details = simplifyObject(meta.details);
+    }
+
     logger.log({
         level,
         tag,
-        message: typeof message === 'object' ? JSON.stringify(message, null, 2) : String(message),
+        message: typeof processedMessage === 'object' ? JSON.stringify(processedMessage, null, 2) : String(processedMessage),
         ...meta
     });
 }
