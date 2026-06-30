@@ -69,8 +69,8 @@
 | 🤖 **AI Command** | Built-in GPT-powered chat via free API |
 | ⏰ **Reminders** | Set time-based reminders — checked every 30 seconds |
 | 🛡️ **Spam Protection** | Auto-bans spammers, configurable thresholds |
-| 📜 **Robust Logging** | Winston-powered daily rotation and webhook support |
-| 🕵️ **Anti-Ban** | Human-like delays and typing indicators |
+| 📜 **Robust Logging** | Winston-powered with daily rotation, structured JSON, and webhook support |
+| 🕵️ **Anti-Ban** | Real human-like delays, typing indicators, and rate-limit backoff |
 | 🤖 **AI Fallback** | Automatically routes unknown commands to AI |
 | 🐐 **GoatV2 Core** | Fully ported core system and lifecycle support |
 | 💳 **Advanced Bank** | Complete banking system with ATM cards |
