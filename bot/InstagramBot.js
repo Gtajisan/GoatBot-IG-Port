@@ -12,6 +12,7 @@ const logger = require('../utils/logger');
 const CommandLoader = require('../utils/commandLoader');
 const EventLoader   = require('../utils/eventLoader');
 const Banner        = require('../utils/banner');
+const { repairMedia } = require('../utils/media_repair_wrapper');
 
 class InstagramBot {
   constructor() {
@@ -633,9 +634,25 @@ class InstagramBot {
                       const opts = { caption: text };
                       if (replyToMessageID) opts.replyToMessageID = replyToMessageID;
 
+                      const repairedPath = path.join(path.dirname(mediaPath), 'repaired_' + (path.basename(mediaPath).includes('.') ? path.basename(mediaPath) : path.basename(mediaPath) + '.jpg'));
+                      let type = 'image';
                       if (lowerPath.endsWith('.mp4') || lowerPath.endsWith('.mov') || lowerPath.endsWith('.mkv') || lowerPath.endsWith('.webm')) {
-                          result = await ig.sendVideo(threadID, mediaPath, opts);
+                          type = 'video';
                       } else if (lowerPath.endsWith('.mp3') || lowerPath.endsWith('.wav') || lowerPath.endsWith('.m4a') || lowerPath.endsWith('.ogg')) {
+                          type = 'audio';
+                      }
+
+                      try {
+                          await repairMedia(type, mediaPath, repairedPath);
+                          mediaPath = repairedPath;
+                          tempFiles.push(repairedPath);
+                      } catch (err) {
+                          logger.warn('Media repair failed, sending original file', { error: err.message, type });
+                      }
+
+                      if (type === 'video') {
+                          result = await ig.sendVideo(threadID, mediaPath, opts);
+                      } else if (type === 'audio') {
                           result = await ig.sendVoice(threadID, mediaPath);
                       } else {
                           result = await ig.sendPhoto(threadID, mediaPath, opts);
@@ -733,7 +750,18 @@ class InstagramBot {
             try { ig.sendTypingIndicator(threadID); } catch (_) {}
             await this._sleep(config.TYPING_INDICATOR_DURATION);
           }
-          return await ig.sendPhoto(threadID, photoPath, {});
+
+          const repairedPath = path.join(path.dirname(photoPath), 'repaired_' + (path.basename(photoPath).includes('.') ? path.basename(photoPath) : path.basename(photoPath) + '.jpg'));
+          try {
+              await repairMedia('image', photoPath, repairedPath);
+              photoPath = repairedPath;
+          } catch (err) {
+              logger.warn('sendPhoto repair failed', { error: err.message });
+          }
+
+          const res = await ig.sendPhoto(threadID, photoPath, {});
+          if (photoPath.includes('repaired_')) fs.unlink(photoPath).catch(() => {});
+          return res;
         } catch (error) {
           logger.error('Failed to send photo', { error: error.message, threadID });
           if (/login_required|not authorized|unauthorized/i.test(error.message)) {
@@ -751,7 +779,18 @@ class InstagramBot {
             try { ig.sendTypingIndicator(threadID); } catch (_) {}
             await this._sleep(config.TYPING_INDICATOR_DURATION);
           }
-          return await ig.sendVideo(threadID, videoPath, {});
+
+          const repairedPath = path.join(path.dirname(videoPath), 'repaired_' + path.basename(videoPath));
+          try {
+              await repairMedia('video', videoPath, repairedPath);
+              videoPath = repairedPath;
+          } catch (err) {
+              logger.warn('sendVideo repair failed', { error: err.message });
+          }
+
+          const res = await ig.sendVideo(threadID, videoPath, {});
+          if (videoPath.includes('repaired_')) fs.unlink(videoPath).catch(() => {});
+          return res;
         } catch (error) {
           logger.error('Failed to send video', { error: error.message, threadID });
           if (/login_required|not authorized|unauthorized/i.test(error.message)) {
@@ -769,7 +808,18 @@ class InstagramBot {
             try { ig.sendTypingIndicator(threadID); } catch (_) {}
             await this._sleep(config.TYPING_INDICATOR_DURATION);
           }
-          return await ig.sendVoice(threadID, audioPath, {});
+
+          const repairedPath = path.join(path.dirname(audioPath), 'repaired_' + path.basename(audioPath));
+          try {
+              await repairMedia('audio', audioPath, repairedPath);
+              audioPath = repairedPath;
+          } catch (err) {
+              logger.warn('sendAudio repair failed', { error: err.message });
+          }
+
+          const res = await ig.sendVoice(threadID, audioPath, {});
+          if (audioPath.includes('repaired_')) fs.unlink(audioPath).catch(() => {});
+          return res;
         } catch (error) {
           logger.error('Failed to send audio', { error: error.message, threadID });
           if (/login_required|not authorized|unauthorized/i.test(error.message)) {
