@@ -5,7 +5,7 @@ const path = require("path");
 module.exports = {
   config: {
     name: "hubble",
-    version: "1.0.0",
+    version: "1.0.1",
     author: "NTKhang",
     cooldown: 5,
     role: 0,
@@ -18,8 +18,13 @@ module.exports = {
     const pathData = path.join(process.cwd(), 'storage', 'hubble_nasa.json');
     if (!fs.existsSync(pathData)) {
         await fs.ensureDir(path.dirname(pathData));
-        const res = await axios.get('https://raw.githubusercontent.com/Gtajisan/Goat-Bot-V2/main/scripts/cmds/assets/hubble/nasa.json');
-        await fs.writeJson(pathData, res.data);
+        try {
+          const res = await axios.get('https://raw.githubusercontent.com/Gtajisan/Goat-Bot-V2/main/scripts/cmds/assets/hubble/nasa.json');
+          await fs.writeJson(pathData, res.data);
+        } catch (error) {
+          // Fallback to empty array if the external resource is unavailable
+          await fs.writeJson(pathData, []);
+        }
     }
   },
 
@@ -28,7 +33,16 @@ module.exports = {
     if (!dateInput) return message.reply("Please provide a date in mm-dd format (e.g. 05-12).");
 
     const pathData = path.join(process.cwd(), 'storage', 'hubble_nasa.json');
-    const hubbleData = await fs.readJson(pathData);
+    let hubbleData;
+    try {
+        hubbleData = await fs.readJson(pathData);
+    } catch (e) {
+        hubbleData = [];
+    }
+
+    if (!Array.isArray(hubbleData) || hubbleData.length === 0) {
+        return message.reply("The Hubble birthday database is currently unavailable.");
+    }
 
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -43,7 +57,7 @@ module.exports = {
     }
 
     const dateText = `${monthNames[month - 1]} ${day}`;
-    const data = hubbleData.find(e => e.date.startsWith(dateText));
+    const data = hubbleData.find(e => e.date && e.date.startsWith(dateText));
 
     if (!data) return message.reply("No image found for this date.");
 
