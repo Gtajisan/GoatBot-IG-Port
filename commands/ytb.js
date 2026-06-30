@@ -1,42 +1,92 @@
-const axios = require('axios');
+const axios = require("axios");
+const fs = require("fs-extra");
+const path = require("path");
 
 module.exports = {
   config: {
-    name: 'ytb',
-    aliases: ['youtube', 'yt'],
-    description: 'Download YouTube video or audio',
-    usage: 'ytb -v <query> | ytb -a <query>',
-    cooldown: 15,
+    name: "ytb",
+    version: "1.1.1",
+    author: "Neoaz 🐊",
+    cooldown: 5,
     role: 0,
-    category: 'media'
+    description: "YouTube downloader (video/audio)",
+    category: "media",
+    usage: "ytb -a <query> or ytb -v <query>"
   },
 
-  async onStart({ api, event, args, message }) {
-    const type  = args[0];
-    const query = args.slice(1).join(' ');
+  onStart: async function ({ message, args, event, api, commandName }) {
+    const type = args[0];
+    const query = args.slice(1).join(" ");
 
-    if (!query || !['-v', '-a'].includes(type)) {
-      return message.reply('❌ Invalid usage.\nUsage: ytb -v <query> (video) or ytb -a <query> (audio)');
+    if (!["-a", "-v"].includes(type) || !query) {
+      return message.reply(`Usage: ${this.config.name} -a <query> (audio) or -v <query> (video)`);
     }
 
-    message.reaction('⏳');
+    try {
+      api.setMessageReaction("⏳", event.messageID, () => {}, true);
+      const res = await axios.get(`https://neokex-dlapis.vercel.app/api/search?q=${encodeURIComponent(query)}`);
+      const results = res.data.results.slice(0, 6);
+
+      if (results.length === 0) {
+        api.setMessageReaction("❌", event.messageID, () => {}, true);
+        return message.reply("No results found.");
+      }
+
+      let msg = "";
+      results.forEach((v, i) => {
+        msg += `${i + 1}. ${v.title}\n[${v.duration}]\n\n`;
+      });
+
+      await message.reply({ body: msg.trim() + "\n\nReply with number to download." }, (err, info) => {
+        if (err) return;
+        global.GoatBot.onReply.set(info.messageID, {
+          commandName,
+          author: event.senderID,
+          results,
+          downloadType: type === "-a" ? "audio" : "video"
+        });
+      });
+      api.setMessageReaction("✅", event.messageID, () => {}, true);
+    } catch (e) {
+      api.setMessageReaction("❌", event.messageID, () => {}, true);
+      message.reply("Search error.");
+    }
+  },
+
+  onReply: async function ({ message, event, Reply, api }) {
+    if (event.senderID !== Reply.author) return;
+    const choice = parseInt(event.body);
+    if (isNaN(choice) || choice < 1 || choice > Reply.results.length) return;
+
+    const selected = Reply.results[choice - 1];
+    api.unsendMessage(event.messageReply.messageID);
+    api.setMessageReaction("⏳", event.messageID, () => {}, true);
 
     try {
-      const response = await axios.get(`https://api.jisan-official.com/ytb?query=${encodeURIComponent(query)}&type=${type === '-a' ? 'audio' : 'video'}`);
-      const data = response.data;
+      const dlRes = await axios.get(`https://neokex-dlapis.vercel.app/api/alldl?url=${encodeURIComponent(selected.url)}`);
+      const pollUrl = dlRes.data[Reply.downloadType].downloadUrl;
 
-      if (!data.url) return message.reply('❌ Failed to fetch download link.');
-
-      if (type === '-v') {
-          await message.reply({ body: data.title || '', attachment: data.url });
-      } else {
-          await message.reply({ attachment: data.url });
+      let streamUrl = null;
+      for (let i = 0; i < 60; i++) {
+        const statusRes = await axios.get(pollUrl);
+        if (statusRes.data.status === "completed") {
+          streamUrl = statusRes.data.viewUrl;
+          break;
+        }
+        await new Promise(r => setTimeout(r, 1000));
       }
-      message.reaction('✅');
-    } catch (error) {
-      console.error('YTB Error:', error.message);
-      message.reaction('❌');
-      message.reply('❌ Failed to download from YouTube.');
+
+      if (!streamUrl) throw new Error("Processing timeout.");
+
+      await message.reply({
+        body: `✅ | ${selected.title}`,
+        attachment: streamUrl
+      });
+
+      api.setMessageReaction("✅", event.messageID, () => {}, true);
+    } catch (e) {
+      api.setMessageReaction("❌", event.messageID, () => {}, true);
+      message.reply("Download error.");
     }
   }
 };

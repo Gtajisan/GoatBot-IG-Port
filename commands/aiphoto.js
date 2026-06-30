@@ -2,14 +2,14 @@ const axios = require("axios");
 
 module.exports = {
   config: {
-    name: "imagen4",
+    name: "aiphoto",
     version: "1.0.0",
     author: "Neoaz 🐦",
     cooldown: 5,
     role: 0,
-    description: "Generate image using Imagen4",
+    description: "Generate AI photo from prompt",
     category: "ai-image",
-    usage: "imagen4 <prompt>"
+    usage: "aiphoto <prompt>"
   },
 
   onStart: async function ({ message, args, event, api }) {
@@ -19,16 +19,16 @@ module.exports = {
     api.setMessageReaction("⏳", event.messageID, () => {}, true);
 
     try {
-      const url = `https://nkximggen.onrender.com/api/imagen4?prompt=${encodeURIComponent(prompt)}`;
+      const url = `https://nkximggen.onrender.com/api/aiphoto?prompt=${encodeURIComponent(prompt)}`;
       await message.reply({
-        body: `✅ | Imagen4: "${prompt}"`,
+        body: `✅ | Generated: "${prompt}"`,
         attachment: url
       });
       api.setMessageReaction("✅", event.messageID, () => {}, true);
     } catch (error) {
-      console.error('imagen4 error:', error.message);
+      console.error('aiphoto error:', error.message);
       api.setMessageReaction("❌", event.messageID, () => {}, true);
-      message.reply("❌ | Failed to generate Imagen4 image.");
+      message.reply("❌ | Failed to generate AI photo.");
     }
   }
 };
