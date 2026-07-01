@@ -4,7 +4,7 @@ const config = require('../config');
 
 module.exports = {
   config: { name: 'ready', description: 'Fired once the bot connects to Instagram' },
-  async run(bot) {
+  async run({ bot }) {
     const cc = bot.commandLoader.getAllCommandNames().length;
     const ec = bot.eventLoader.getAllEventNames().length;
     Banner.startupMessage(bot.userID, bot.username, cc, ec);
