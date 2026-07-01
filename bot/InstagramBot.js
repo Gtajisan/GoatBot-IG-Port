@@ -89,18 +89,30 @@ class InstagramBot {
         throw new Error('No credentials found. Please provide IG_COOKIES or set up account.txt / EMAIL & PASSWORD.');
     }
 
+    // User explicitly requested to "fix the fca keep our old fca remove new"
+    // We restore Instagram-FCA as primary.
     logger.info('Logging in with Instagram-FCA (Primary)...');
     try {
         this.fca = await loginFca(credentials, config.OPTIONS_FCA);
+        logger.info('Instagram-FCA login successful');
     } catch (e) {
         logger.error('Instagram-FCA login failed', { error: e.message });
-        throw e;
+        // Attempt nkxica if FCA fails
+        logger.info('Attempting login with nkxica (Fallback)...');
+        try {
+            this.nkxica = await loginNkxica(credentials);
+            logger.info('nkxica login successful');
+        } catch (nkErr) {
+            logger.error('nkxica login failed', { error: nkErr.message });
+            throw e; // Throw original FCA error
+        }
     }
 
-    if (config.EXPERIMENTAL_FCA_ENABLE) {
+    if (config.EXPERIMENTAL_FCA_ENABLE && !this.nkxica) {
         try {
-            logger.info('Logging in with nkxica (Fallback)...');
+            logger.info('Logging in with nkxica (Secondary)...');
             this.nkxica = await loginNkxica(credentials);
+            logger.info('nkxica login successful');
         } catch (e) {
             logger.warn('nkxica login failed, continuing with Instagram-FCA only.');
         }
@@ -110,24 +122,25 @@ class InstagramBot {
   }
 
   _afterLogin() {
+    const primary = this.fca || this.nkxica;
+    if (!primary) throw new Error('No API instance available after login.');
+
     try {
-      this.userID = String(this.fca.getCurrentUserID());
-      this.username = this.fca.currentUsername || this.userID;
+      this.userID = String(primary.getCurrentUserID ? primary.getCurrentUserID() : (primary.userID || primary.id || 'unknown'));
+      this.username = primary.currentUsername || this.userID;
     } catch (e) {
       this.userID = 'unknown';
       this.username = 'unknown';
     }
 
     const nkxicaWrapper = this.nkxica ? this.createNkxicaWrapper() : null;
-    // For now, we use FCA as primary directly or through DualFca if nkxica is enabled
-    // If nkxica is fallback, we swap the order in DualFca or just use FCA
-    this.api = this.fca;
 
-    if (nkxicaWrapper) {
-        // If we wanted to use DualFca with FCA as primary:
-        // this.api = createDualFca(this.fca, nkxicaWrapper);
-        // But DualFca was designed with nkxica as target and fca as fallback.
-        // Let's keep it simple for now and use FCA as primary.
+    // Default to FCA if available, else nkxica
+    this.api = this.fca || nkxicaWrapper;
+
+    if (this.fca && nkxicaWrapper) {
+        // Use DualFca with FCA as primary and nkxica as secondary fallback
+        this.api = createDualFca(this.fca, nkxicaWrapper);
     }
 
     global.GoatBot.fcaApi = this.api;
@@ -183,7 +196,7 @@ class InstagramBot {
     const ig = this.nkxica;
     const self = this;
 
-    return {
+    const wrapper = {
       sendMessage: async (form, threadID, callback, replyToMessageID) => {
           let finalForm = form;
           if (typeof form === 'string') finalForm = { body: form };
@@ -196,11 +209,37 @@ class InstagramBot {
               throw e;
           }
       },
-      getUserInfo: async (id) => await ig.getUserInfo(id),
-      unsendMessage: async (id) => await ig.unsendMessage(id),
-      setMessageReaction: async (emoji, id) => await ig.sendReaction(emoji, id),
-      markAsRead: async (threadID) => await ig.markAsRead(threadID)
+      getUserInfo: async (id) => {
+          if (typeof ig.getUserInfo === 'function') return await ig.getUserInfo(id);
+          return {};
+      },
+      unsendMessage: async (id) => {
+          if (typeof ig.unsendMessage === 'function') return await ig.unsendMessage(id);
+      },
+      setMessageReaction: async (emoji, id) => {
+          if (typeof ig.sendReaction === 'function') return await ig.sendReaction(emoji, id);
+          if (typeof ig.setMessageReaction === 'function') return await ig.setMessageReaction(emoji, id);
+      },
+      markAsRead: async (threadID) => {
+          if (typeof ig.markAsRead === 'function') return await ig.markAsRead(threadID);
+      },
+      listen: (callback) => {
+          if (typeof ig.listen === 'function') return ig.listen(callback);
+      },
+      getCurrentUserID: () => {
+          if (typeof ig.getCurrentUserID === 'function') return ig.getCurrentUserID();
+          return ig.userID || ig.id || 'unknown';
+      }
     };
+
+    return new Proxy(ig, {
+        get(target, prop) {
+            if (prop in wrapper) return wrapper[prop];
+            const value = target[prop];
+            if (typeof value === 'function') return value.bind(target);
+            return value;
+        }
+    });
   }
 
   startHealthServer() {
