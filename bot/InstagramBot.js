@@ -59,6 +59,7 @@ class InstagramBot {
       this._scheduleAutoRestart();
       this._scheduleAutoUptime();
       this.isRunning = true;
+      this.resetWatchdog();
 
       this.eventLoader.handleEvent('ready', this);
 
@@ -159,27 +160,34 @@ class InstagramBot {
     global.GoatBot.fcaApi = this.api;
     global.api = this.api;
 
-    this.api.listen((err, event) => {
-        if (err) {
-            logger.error('Listen error', { error: err.message });
-            // If the listener has a fatal error, we schedule a reconnect
-            if (this.isRunning && this.shouldReconnect) {
-                logger.warn('Fatal listen error detected. Restarting bot...');
-                this.isRunning = false;
-                this.scheduleReconnect();
-                if (config.AUTO_RESTART_WHEN_MQTT_ERROR) {
-                    logger.info("Auto-restart enabled. Exiting process...");
-                    setTimeout(() => process.exit(1), 1000);
+    this.api.listen(async (err, event) => {
+        try {
+            if (err) {
+                logger.error('Listen error', { error: err.message });
+                // If the listener has a fatal error, we schedule a reconnect
+                if (this.isRunning && this.shouldReconnect) {
+                    logger.warn('Fatal listen error detected. Restarting bot...');
+                    this.isRunning = false;
+                    this.scheduleReconnect();
+                    if (config.AUTO_RESTART_WHEN_MQTT_ERROR) {
+                        logger.info("Auto-restart enabled. Exiting process...");
+                        setTimeout(() => process.exit(1), 1000);
+                    }
                 }
+                return;
             }
-            return;
-        }
-        logger.debug(`Received event: ${event.type || "unknown"} from ${event.senderID || event.user_id || "unknown"}`);
-        this.resetWatchdog();
-        if (!event) return;
 
-        const normalizedEvent = this.normalizeEvent(event);
-        this.eventLoader.handleEvent(normalizedEvent.type, normalizedEvent);
+            this.resetWatchdog();
+            this.lastEventTime = Date.now();
+
+            if (!event) return;
+            logger.debug(`Received event: ${event.type || "unknown"} from ${event.senderID || event.user_id || "unknown"}`);
+
+            const normalizedEvent = this.normalizeEvent(event);
+            await this.eventLoader.handleEvent(normalizedEvent.type, normalizedEvent);
+        } catch (e) {
+            logger.error('Critical error in listener callback', { error: e.message, stack: e.stack });
+        }
     });
 
     const database = require('../utils/database');
@@ -305,13 +313,20 @@ class InstagramBot {
               res.writeHead(200, { 'Content-Type': 'application/json' });
 
               if (apiPath === '/status') {
+                  const now = Date.now();
+                  const lastEventSec = this.lastEventTime ? Math.floor((now - this.lastEventTime) / 1000) : null;
                   return res.end(JSON.stringify({
                       status: this.api ? 'online' : 'offline',
                       uptime: process.uptime(),
                       memory: process.memoryUsage(),
                       platform: process.platform,
                       version: config.BOT_VERSION,
-                      botName: config.BOT_NAME
+                      botName: config.BOT_NAME,
+                      watchdog: {
+                          lastEventSeconds: lastEventSec,
+                          timeoutSeconds: this.WATCHDOG_DELAY / 1000,
+                          active: !!this.watchdogTimer
+                      }
                   }));
               }
 
