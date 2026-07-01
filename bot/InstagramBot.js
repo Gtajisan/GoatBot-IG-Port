@@ -89,29 +89,29 @@ class InstagramBot {
         throw new Error('No credentials found. Please provide IG_COOKIES or set up account.txt / EMAIL & PASSWORD.');
     }
 
-    logger.info('Logging in with Instagram-FCA (Primary)...');
+    logger.info('Logging in with nkxica (Primary)...');
     try {
-        this.fca = await loginFca(credentials, config.OPTIONS_FCA);
-        logger.info('Instagram-FCA login successful');
+        this.nkxica = await loginNkxica(credentials);
+        logger.info('nkxica login successful');
     } catch (e) {
-        logger.error('Instagram-FCA login failed', { error: e.message });
-        logger.info('Attempting login with nkxica (Fallback)...');
+        logger.error('nkxica login failed', { error: e.message });
+        logger.info('Attempting login with Instagram-FCA (Fallback)...');
         try {
-            this.nkxica = await loginNkxica(credentials);
-            logger.info('nkxica login successful');
-        } catch (nkErr) {
-            logger.error('nkxica login failed', { error: nkErr.message });
+            this.fca = await loginFca(credentials, config.OPTIONS_FCA);
+            logger.info('Instagram-FCA login successful');
+        } catch (fcaErr) {
+            logger.error('Instagram-FCA login failed', { error: fcaErr.message });
             throw e;
         }
     }
 
-    if (config.EXPERIMENTAL_FCA_ENABLE && !this.nkxica) {
+    if (config.EXPERIMENTAL_FCA_ENABLE && !this.fca) {
         try {
-            logger.info('Logging in with nkxica (Secondary)...');
-            this.nkxica = await loginNkxica(credentials);
-            logger.info('nkxica login successful');
+            logger.info('Logging in with Instagram-FCA (Secondary)...');
+            this.fca = await loginFca(credentials, config.OPTIONS_FCA);
+            logger.info('Instagram-FCA login successful');
         } catch (e) {
-            logger.warn('nkxica login failed, continuing with Instagram-FCA only.');
+            logger.warn('Instagram-FCA login failed, continuing with nkxica only.');
         }
     }
 
@@ -119,7 +119,7 @@ class InstagramBot {
   }
 
   _afterLogin() {
-    const primary = this.fca || this.nkxica;
+    const primary = this.nkxica || this.fca;
     if (!primary) throw new Error('No API instance available after login.');
 
     try {
@@ -132,10 +132,10 @@ class InstagramBot {
 
     const nkxicaWrapper = this.nkxica ? this.createNkxicaWrapper() : null;
 
-    this.api = this.fca || nkxicaWrapper;
+    this.api = nkxicaWrapper || this.fca;
 
-    if (this.fca && nkxicaWrapper) {
-        this.api = createDualFca(this.fca, nkxicaWrapper);
+    if (nkxicaWrapper && this.fca) {
+        this.api = createDualFca(nkxicaWrapper, this.fca);
     }
 
     global.GoatBot.fcaApi = this.api;
@@ -244,13 +244,93 @@ class InstagramBot {
 
   startHealthServer() {
       const port = parseInt(process.env.PORT || config.DASHBOARD_PORT || 3000, 10);
-      const server = http.createServer((req, res) => {
+      const server = http.createServer(async (req, res) => {
           const url = new URL(req.url, `http://${req.headers.host}`);
-          if (url.pathname === '/uptime') {
-              res.writeHead(200);
-              res.end('OK');
-              return;
+          const pathname = url.pathname;
+
+          // Dashboard HTML
+          if (pathname === '/' || pathname === '/index.html') {
+              const dashPath = path.join(__dirname, '../dashboard/index.html');
+              if (fs.existsSync(dashPath)) {
+                  res.writeHead(200, { 'Content-Type': 'text/html' });
+                  return res.end(fs.readFileSync(dashPath));
+              }
           }
+
+          if (pathname === '/uptime') {
+              res.writeHead(200);
+              return res.end('OK');
+          }
+
+          // API Endpoints (Supports both /api/path and /path for dashboard compatibility)
+          const apiPath = pathname.startsWith('/api/') ? pathname.slice(4) : pathname;
+
+          if (pathname.startsWith('/api/') || ['/status', '/threads', '/thread', '/users', '/commands', '/logs'].some(p => pathname.startsWith(p))) {
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+
+              if (apiPath === '/status') {
+                  return res.end(JSON.stringify({
+                      status: this.api ? 'online' : 'offline',
+                      uptime: process.uptime(),
+                      memory: process.memoryUsage(),
+                      platform: process.platform,
+                      version: config.BOT_VERSION,
+                      botName: config.BOT_NAME
+                  }));
+              }
+
+              if (apiPath === '/threads' && this.api) {
+                  try {
+                      const threads = await (this.api.getThreadList ? this.api.getThreadList(20, null, []) : []);
+                      return res.end(JSON.stringify({ threads: Array.isArray(threads) ? threads : [] }));
+                  } catch (e) {
+                      return res.end(JSON.stringify({ threads: [], error: e.message }));
+                  }
+              }
+
+              if (apiPath.startsWith('/thread/') && this.api) {
+                  const tid = apiPath.split('/').pop();
+                  try {
+                      const info = await (this.api.getThreadInfo ? this.api.getThreadInfo(tid) : {});
+                      return res.end(JSON.stringify(info));
+                  } catch (e) {
+                      return res.end(JSON.stringify({ error: e.message }));
+                  }
+              }
+
+              if (apiPath === '/users') {
+                  const database = require('../utils/database');
+                  return res.end(JSON.stringify({
+                      users: database.getAllUsers(),
+                      economy: database.data.economy || {},
+                      banned: [...database.data.bannedUsers]
+                  }));
+              }
+
+              if (apiPath === '/commands') {
+                  const cmds = [];
+                  for (const [name, cmd] of this.commandLoader.commands) {
+                      cmds.push({ ...cmd.config, name });
+                  }
+                  return res.end(JSON.stringify({ commands: cmds }));
+              }
+
+              if (apiPath === '/logs') {
+                  const logDir = path.join(process.cwd(), 'logs');
+                  if (fs.existsSync(logDir)) {
+                      const files = fs.readdirSync(logDir).filter(f => f.startsWith('combined-') && f.endsWith('.log')).sort().reverse();
+                      if (files.length > 0) {
+                          const content = fs.readFileSync(path.join(logDir, files[0]), 'utf-8');
+                          const lines = content.split('\n').filter(Boolean).slice(-300).map(l => {
+                              try { return JSON.parse(l); } catch(e) { return { message: l, level: 'INFO', time: new Date().toISOString() }; }
+                          });
+                          return res.end(JSON.stringify({ logs: lines }));
+                      }
+                  }
+                  return res.end(JSON.stringify({ logs: [] }));
+              }
+          }
+
           res.writeHead(200);
           res.end('Bot is running');
       });
