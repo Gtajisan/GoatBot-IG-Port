@@ -24,6 +24,8 @@ class InstagramBot {
     this.reconnectAttempts = 0;
     this.shouldReconnect = config.AUTO_RECONNECT;
     this.isRunning = false;
+    this.watchdogTimer = null;
+    this.WATCHDOG_DELAY = 15 * 60 * 1000; // 15 minutes
 
     // Initialize global GoatBot structure for V2 compatibility
     global.GoatBot = {
@@ -64,6 +66,10 @@ class InstagramBot {
       logger.error('Failed to start bot', { error: error.message, stack: error.stack });
       if (this.shouldReconnect && this.reconnectAttempts < config.MAX_RECONNECT_ATTEMPTS) {
         this.scheduleReconnect();
+                if (config.AUTO_RESTART_WHEN_MQTT_ERROR) {
+                    logger.info("Auto-restart enabled. Exiting process...");
+                    setTimeout(() => process.exit(1), 1000);
+                }
       } else {
         process.exit(1);
       }
@@ -161,9 +167,15 @@ class InstagramBot {
                 logger.warn('Fatal listen error detected. Restarting bot...');
                 this.isRunning = false;
                 this.scheduleReconnect();
+                if (config.AUTO_RESTART_WHEN_MQTT_ERROR) {
+                    logger.info("Auto-restart enabled. Exiting process...");
+                    setTimeout(() => process.exit(1), 1000);
+                }
             }
             return;
         }
+        logger.debug(`Received event: ${event.type || "unknown"} from ${event.senderID || event.user_id || "unknown"}`);
+        this.resetWatchdog();
         if (!event) return;
 
         const normalizedEvent = this.normalizeEvent(event);
@@ -364,6 +376,18 @@ class InstagramBot {
           }
       });
       server.listen(port);
+  }
+
+  resetWatchdog() {
+      if (this.watchdogTimer) clearTimeout(this.watchdogTimer);
+      this.watchdogTimer = setTimeout(() => {
+          logger.warn('Watchdog timeout: No events received for 15 minutes. Reconnecting...');
+          this.scheduleReconnect();
+                if (config.AUTO_RESTART_WHEN_MQTT_ERROR) {
+                    logger.info("Auto-restart enabled. Exiting process...");
+                    setTimeout(() => process.exit(1), 1000);
+                }
+      }, this.WATCHDOG_DELAY);
   }
 
   scheduleReconnect() {

@@ -64,12 +64,12 @@ module.exports = {
 
       if (!commandName) return;
 
-      const command = commandLoader.getCommand(commandName);
+      const command = commandLoader.getCommand(commandName); if (command) logger.debug(`Executing command: ${commandName} for user: ${event.senderID}`);
       if (!command) {
           // Alias check
           for (const [name, cmd] of commandLoader.commands) {
               if (cmd.config.aliases && cmd.config.aliases.includes(commandName)) {
-                  return await this.executeCommand(cmd, { api, event, args, bot, commandName: cmd.config.name, logger, database, config, prefix });
+                  logger.debug(`Executing command alias: ${commandName} (target: ${cmd.config.name}) for user: ${event.senderID}`); return await this.executeCommand(cmd, { api, event, args, bot, commandName: cmd.config.name, logger, database, config, prefix });
               }
           }
           return;
