@@ -155,7 +155,7 @@ async function loginWithAppState(appState, session, httpClient, options) {
       params: { edit: 'true' }
     });
 
-    if (response.data && response.data.user) {
+    if (response.status === 200 && response.data && response.data.user) {
       const user = response.data.user;
       session.userId = user.pk || user.pk_id;
       session.username = user.username;
@@ -170,15 +170,6 @@ async function loginWithAppState(appState, session, httpClient, options) {
         username: session.username,
         user: user
       };
-    } else if (session.userId && session.isLoggedIn) {
-        // Fallback: If we have userId from cookies and the request didn't fail with 401/403
-        log.warn('Validation returned unexpected data, but session appears active via cookies.');
-        return {
-            success: true,
-            userId: session.userId,
-            username: session.username || 'unknown',
-            user: response.data || {}
-        };
     }
 
     log.debug("Validation failed", { status: response.status, data: response.data });

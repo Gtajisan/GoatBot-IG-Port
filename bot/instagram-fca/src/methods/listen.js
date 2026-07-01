@@ -89,10 +89,15 @@ async function listen(callback) {
       }
     } catch (error) {
       consecutiveErrors++;
-      log.error('Listen error:', error.message);
+      const isStatus400 = error.response?.status === 400;
+      log.error(`Listen error [${error.response?.status || "NETWORK"}]:`, error.message);
 
-      if (consecutiveErrors >= 20) {
-        log.warn('Too many consecutive listen errors. Stopping listener and propagating error.');
+      // If we get multiple 400s, it means the session or headers are rejected.
+      // We trigger a fatal error sooner to allow the bot to reconnect.
+      const errorThreshold = isStatus400 ? 5 : 20;
+
+      if (consecutiveErrors >= errorThreshold) {
+        log.warn(`Too many consecutive listen errors (${consecutiveErrors}). Stopping listener.`);
         this.isListening = false;
         if (callback) callback(error);
         this.emit('error', error);
