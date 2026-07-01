@@ -42,7 +42,9 @@
     "autoSyncWhenStart": false,
     "autoRefreshThreadInfoFirstTime": true
   },
-  "messageDelayMs": 100, "experimentalFca": { "enable": false }, "useFcaFallback": { "text": false, "image": false, "video": false, "audio": false },
+  "messageDelayMs": 100,
+  "experimentalFca": { "enable": false },
+  "useFcaFallback": { "text": false, "image": false, "video": false, "audio": false },
   "timeZone": "Asia/Dhaka",
   "dashBoard": {
     "enable": true,
@@ -121,8 +123,8 @@
     "duration": 1500
   },
   "humanDelay": {
-    "min": 1500,
-    "max": 4000
+    "min": 1000,
+    "max": 3000
   },
   "logging": {
     "logLevel": "info",

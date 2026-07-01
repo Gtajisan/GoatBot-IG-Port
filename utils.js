@@ -190,7 +190,7 @@ function enableStderrClearLine(isEnable = true) {
 }
 
 function formatNumber(number) {
-	const regionCode = global.GoatBot.config.language;
+	const regionCode = global.GoatBot?.config?.language;
 	if (isNaN(number))
 		throw new Error('The first argument (number) must be a number');
 
@@ -214,17 +214,26 @@ function getExtFromAttachmentType(type) {
 }
 
 function getExtFromMimeType(mimeType = "") {
-	return mimeDB[mimeType] ? (mimeDB[mimeType].extensions || [])[0] || "unknow" : "unknow";
+	return mimeDB[mimeType] ? (mimeDB[mimeType].extensions || [])[0] || "unknown" : "unknown";
 }
 
 function getExtFromUrl(url = "") {
 	if (!url || typeof url !== "string")
 		throw new Error('The first argument (url) must be a string');
+
+    // Improved extension extraction
+    try {
+        const urlObj = new URL(url);
+        const pathname = urlObj.pathname;
+        const ext = pathname.split('.').pop();
+        if (ext && ext.length <= 4 && /^[a-z0-9]+$/i.test(ext)) return ext.toLowerCase();
+    } catch (e) {}
+
 	const reg = /(?<=https:\/\/cdn.fbsbx.com\/v\/.*?\/|https:\/\/video.xx.fbcdn.net\/v\/.*?\/|https:\/\/scontent.xx.fbcdn.net\/v\/.*?\/).*?(\/|\?)/g;
 	const match = url.match(reg);
-    if (!match) return "unknow";
+    if (!match) return "unknown";
 	const fileName = match[0].slice(0, -1);
-	return fileName.slice(fileName.lastIndexOf(".") + 1);
+	return fileName.slice(fileName.lastIndexOf(".") + 1) || "unknown";
 }
 
 function getPrefix(threadID) {
@@ -340,7 +349,7 @@ function message(api, event) {
         if (typeof err === "object" && !err.stack)
             err = utils.removeHomeDir(JSON.stringify(err, null, 2));
         else
-            err = utils.removeHomeDir(`${err.name || err.error || 'Error'}: ${err.message}`);
+            err = utils.removeHomeDir(`${err.name || err.error || 'Error'}: ${err.message || String(err)}`);
         return await api.sendMessage(utils.getText("utils", "errorOccurred", err), event.threadId || event.threadID, null, event.messageID);
     }
     return {
@@ -352,8 +361,8 @@ function message(api, event) {
             catch (err) {
                 if (JSON.stringify(err).includes('spam')) {
                     setErrorUptime();
-                    throw err;
                 }
+                throw err;
             }
         },
         reply: async (form, callback) => {
@@ -364,8 +373,8 @@ function message(api, event) {
             catch (err) {
                 if (JSON.stringify(err).includes('spam')) {
                     setErrorUptime();
-                    throw err;
                 }
+                throw err;
             }
         },
         unsend: async (messageID, callback) => await api.unsendMessage(messageID || event.messageID, event.threadId || event.threadID, callback),
@@ -377,15 +386,15 @@ function message(api, event) {
             catch (err) {
                 if (JSON.stringify(err).includes('spam')) {
                     setErrorUptime();
-                    throw err;
                 }
+                throw err;
             }
         },
         err: async (err) => await sendMessageError(err),
         error: async (err) => await sendMessageError(err),
         SyntaxError: async () => {
             const prefix = utils.getPrefix(event.threadId || event.threadID);
-            const commandName = event.body.split(" ")[0].slice(prefix.length);
+            const commandName = (event.body || "").split(" ")[0].slice(prefix.length);
             return await api.sendMessage(`❌ Syntax Error!\nUse: ${prefix}help ${commandName} for usage instructions.`, event.threadId || event.threadID, null, event.messageID);
         }
     };
@@ -503,11 +512,11 @@ async function getStreamsFromAttachment(attachments) {
 		const ext = utils.getExtFromUrl(url);
 		const fileName = `${utils.randomString(10)}.${ext}`;
 		streams.push({
-			pending: axios({
+			pending: utils.withBackoff(() => axios({
 				url,
 				method: "GET",
 				responseType: "stream"
-			}),
+			})),
 			fileName
 		});
 	}
@@ -745,11 +754,11 @@ class GoatBotApis {
 			let responseDataError;
 			const promise = () => new Promise((resolveFunc) => {
 				// decode all response data to utf8 (string) if responseType is 
-				if (error.response.config.responseType === "arraybuffer") {
+				if (error.response?.config?.responseType === "arraybuffer") {
 					responseDataError = Buffer.from(error.response.data, "binary").toString("utf8");
 					resolveFunc();
 				}
-				else if (error.response.config.responseType === "stream") {
+				else if (error.response?.config?.responseType === "stream") {
 					let data = "";
 					error.response.data.on("data", (chunk) => {
 						data += chunk;
@@ -760,7 +769,7 @@ class GoatBotApis {
 					});
 				}
 				else {
-					responseDataError = error.response.data;
+					responseDataError = error.response?.data || "Unknown Error";
 					resolveFunc();
 				}
 			});
@@ -771,12 +780,12 @@ class GoatBotApis {
 			}
 			catch (err) { }
 			return Promise.reject({
-				status: error.response.status,
-				statusText: error.response.statusText,
+				status: error.response?.status,
+				statusText: error.response?.statusText,
 				responseHeaders: {
-					'x-remaining-requests': parseInt(error.response.headers['x-remaining-requests']),
-					'x-free-remaining-requests': parseInt(error.response.headers['x-free-remaining-requests']),
-					'x-used-requests': parseInt(error.response.headers['x-used-requests'])
+					'x-remaining-requests': parseInt(error.response?.headers['x-remaining-requests']),
+					'x-free-remaining-requests': parseInt(error.response?.headers['x-free-remaining-requests']),
+					'x-used-requests': parseInt(error.response?.headers['x-used-requests'])
 				},
 				data: responseDataError
 			});
@@ -881,9 +890,9 @@ const utils = {
 		} catch (error) {
 			if (retries <= 0) throw error;
 			const errorMessage = error.message || String(error);
-			if (errorMessage.includes('rate limit') || errorMessage.includes('spam') || errorMessage.includes('429')) {
+			if (errorMessage.includes('rate limit') || errorMessage.includes('spam') || errorMessage.includes('429') || errorMessage.includes('ENOTFOUND')) {
 				const backoffDelay = delay * 2;
-				utils.log.warn('BACKOFF', `Rate limit hit, retrying in ${backoffDelay}ms... (Retries left: ${retries})`);
+				utils.log.warn('BACKOFF', `Rate limit or network hit, retrying in ${backoffDelay}ms... (Retries left: ${retries})`);
 				await new Promise(resolve => setTimeout(resolve, backoffDelay));
 				return utils.withBackoff(fn, retries - 1, backoffDelay);
 			}
