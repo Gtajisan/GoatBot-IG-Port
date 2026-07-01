@@ -1,46 +1,45 @@
 const axios = require('axios');
 const { config } = global.GoatBot;
 const { log, getText } = global.utils;
+
 if (global.timeOutUptime != undefined)
-	clearTimeout(global.timeOutUptime);
-if (!config.autoUptime.enable)
+	clearInterval(global.timeOutUptime);
+
+if (!config.AUTO_UPTIME_ENABLE)
 	return;
 
-const PORT = config.dashBoard?.port || (!isNaN(config.serverUptime.port) && config.serverUptime.port) || 3001;
+const PORT = process.env.PORT || config.DASHBOARD_PORT || 3000;
 
-let myUrl = config.autoUptime.url || `https://${process.env.REPL_OWNER
-	? `${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
-	: process.env.API_SERVER_EXTERNAL == "https://api.glitch.com"
-		? `${process.env.PROJECT_DOMAIN}.glitch.me`
-		: `localhost:${PORT}`}`;
-myUrl.includes('localhost') && (myUrl = myUrl.replace('https', 'http'));
-myUrl += '/uptime';
+// Render uses RENDER_EXTERNAL_URL to provide the full public URL of the service.
+let myUrl = config.AUTO_UPTIME_URL || (process.env.RENDER_EXTERNAL_URL ? `${process.env.RENDER_EXTERNAL_URL}/uptime` : null);
+
+if (!myUrl) {
+    // Fallback for local or Replit environments
+    myUrl = `http://localhost:${PORT}/uptime`;
+}
 
 let status = 'ok';
-setTimeout(async function autoUptime() {
+
+async function autoUptime() {
 	try {
 		await axios.get(myUrl);
 		if (status != 'ok') {
 			status = 'ok';
-			log.info("UPTIME", "Bot is online");
-			// Custome notification here
+			log.info("UPTIME", "Bot is online (Aging Connected)");
 		}
 	}
 	catch (e) {
-		const err = e.response?.data || e;
-		if (status != 'ok')
-			return;
-		status = 'failed';
-
-		if (err.statusAccountBot == "can't login") {
-			log.err("UPTIME", "Can't login account bot");
-			// Custome notification here
-		}
-		else if (err.statusAccountBot == "block spam") {
-			log.err("UPTIME", "Your account is blocked");
-			// Custome notification here
-		}
+		if (status == 'ok') {
+            status = 'failed';
+            log.warn("UPTIME", `Uptime check failed for ${myUrl}: ${e.message}`);
+        }
 	}
-	global.timeOutUptime = setInterval(autoUptime, config.autoUptime.timeInterval);
-}, (config.autoUptime.timeInterval || 180) * 1000);
-log.info("AUTO UPTIME", getText("autoUptime", "autoUptimeTurnedOn", myUrl));
+}
+
+// Initial delay
+setTimeout(() => {
+    autoUptime();
+	global.timeOutUptime = setInterval(autoUptime, (config.AUTO_UPTIME_INTERVAL || 180) * 1000);
+}, 5000);
+
+log.info("AUTO UPTIME", `Auto-uptime started for: ${myUrl}`);

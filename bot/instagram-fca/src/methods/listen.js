@@ -11,23 +11,23 @@ async function listen(callback) {
   }
 
   this.isListening = true;
-  log.info('Starting message listener...');
+  log.info('Starting message listener (Recursive Polling with Aging support)...');
 
   const pollInterval = this.options.listenInterval || 3000;
   let lastSeenTimestamp = Date.now() * 1000;
+  const seenItems = new Set();
   let consecutiveErrors = 0;
+  let timer = null;
 
   const poll = async () => {
     if (!this.isListening) return;
 
     try {
-      const response = await this.http.get(`${INSTAGRAM_API.BASE_URL}${INSTAGRAM_API.INBOX}`, {
-        params: {
-          persistentBadging: true,
-          folder: '',
-          limit: 20,
-          thread_message_limit: 10
-        }
+      const response = await this.http.get(`${INSTAGRAM_API.BASE_URL}/direct_v2/inbox/`, {
+          params: {
+              persistentBadging: 'true',
+              use_unified_inbox: 'true'
+          }
       });
 
       consecutiveErrors = 0;
@@ -37,8 +37,17 @@ async function listen(callback) {
           const items = thread.items || [];
           for (const item of items) {
             const itemTimestamp = parseInt(item.timestamp);
-            if (itemTimestamp > lastSeenTimestamp) {
-              lastSeenTimestamp = itemTimestamp;
+            const itemID = String(item.item_id);
+
+            if (itemTimestamp >= lastSeenTimestamp && !seenItems.has(itemID)) {
+              if (itemTimestamp > lastSeenTimestamp) {
+                  lastSeenTimestamp = itemTimestamp;
+                  if (seenItems.size > 1000) {
+                      const arr = Array.from(seenItems);
+                      arr.slice(0, 500).forEach(id => seenItems.delete(id));
+                  }
+              }
+              seenItems.add(itemID);
 
               if (!this.options.selfListen && item.user_id == this.currentUserId) {
                 continue;
@@ -46,18 +55,25 @@ async function listen(callback) {
 
               const event = {
                 type: 'message',
-                threadID: thread.thread_id,
-                messageID: item.item_id,
+                threadID: String(thread.thread_id),
+                messageID: itemID,
                 senderID: String(item.user_id),
                 body: item.text || '',
                 timestamp: itemTimestamp,
-                isGroup: thread.is_group,
+                isGroup: !!thread.is_group,
                 attachments: [],
                 mentions: {}
               };
 
+              if (item.media) {
+                  event.attachments.push({
+                      type: item.media.media_type === 1 ? 'photo' : 'video',
+                      url: item.media.image_versions2?.candidates?.[0]?.url || item.media.video_versions?.[0]?.url
+                  });
+              }
+
               if (this.options.autoMarkRead) {
-                this.markAsRead(thread.thread_id, item.item_id).catch(() => {});
+                this.markAsRead(thread.thread_id, itemID).catch(() => {});
               }
 
               this.emit('message', event);
@@ -66,28 +82,44 @@ async function listen(callback) {
           }
         }
       }
+
+      // Schedule next poll
+      if (this.isListening) {
+          timer = setTimeout(poll, pollInterval);
+      }
     } catch (error) {
       consecutiveErrors++;
       log.error('Listen error:', error.message);
 
-      if (consecutiveErrors >= 5 && this.options.autoReconnect) {
-        log.warn('Too many errors, reconnecting...');
-        this.session.recordReconnect();
-        consecutiveErrors = 0;
+      if (consecutiveErrors >= 20) {
+        log.warn('Too many consecutive listen errors. Stopping listener and propagating error.');
+        this.isListening = false;
+        if (callback) callback(error);
+        this.emit('error', error);
+        return;
       }
 
-      if (callback) callback(error);
-      this.emit('error', error);
+      // Exponential backoff or simple delay on error
+      const backoff = Math.min(pollInterval * Math.pow(1.5, consecutiveErrors), 60000);
+      if (this.isListening) {
+          timer = setTimeout(poll, backoff);
+      }
     }
   };
 
-  await poll();
-  this.listenerInterval = setInterval(poll, pollInterval);
+  // Start polling
+  poll();
 
   this.emit('listen');
   log.info('Listener started successfully');
 
-  return this.stopListening.bind(this);
+  this.stopListening = () => {
+      this.isListening = false;
+      if (timer) clearTimeout(timer);
+      log.info('Listener stopped');
+  };
+
+  return this.stopListening;
 }
 
 module.exports = listen;

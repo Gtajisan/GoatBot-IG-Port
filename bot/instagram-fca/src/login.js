@@ -1,76 +1,58 @@
 'use strict';
 
 /**
- * Instagram-FCA Login Module
- * Supports both appState (session cookies) and username/password login
- *
- * @author Gtajisan <ffjisan804@gmail.com>
- * @github https://github.com/Gtajisan
+ * Login logic for Instagram-FCA
  */
 
 const axios = require('axios');
-const { CookieJar } = require('tough-cookie');
 const { wrapper } = require('axios-cookiejar-support');
+const { CookieJar } = require('tough-cookie');
 const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 
+const log = require('../lib/logger');
 const Session = require('./session');
 const API = require('./api');
+const { INSTAGRAM_API } = require('./constants');
 const { getRandomUserAgent, USER_AGENTS } = require('../lib/userAgents');
-const { createHttpClient } = require('../lib/http');
-const { encryptPassword, generateDeviceId } = require('../lib/crypto');
-const log = require('../lib/logger');
+const { generateDeviceId } = require('../lib/crypto');
 
-// Instagram API endpoints
-const INSTAGRAM_API = {
-  BASE_URL: 'https://i.instagram.com/api/v1',
-  WEB_URL: 'https://www.instagram.com',
-  LOGIN: '/accounts/login/',
-  LOGOUT: '/accounts/logout/',
-  SYNC: '/launcher/sync/',
-  QESYNC: '/qe/sync/',
-  CURRENT_USER: '/accounts/current_user/',
-  INBOX: '/direct_v2/inbox/',
-  THREADS: '/direct_v2/threads/',
-  PENDING_INBOX: '/direct_v2/pending_inbox/',
-  APPROVE_PENDING: '/direct_v2/threads/{thread_id}/approve/',
-  SEND_MESSAGE: '/direct_v2/threads/broadcast/text/',
-  SEND_PHOTO: '/direct_v2/threads/broadcast/upload_photo/',
-  SEND_VIDEO: '/direct_v2/threads/broadcast/upload_video/',
-  SEND_LINK: '/direct_v2/threads/broadcast/link/',
-  SEND_LIKE: '/direct_v2/threads/broadcast/like/',
-  MARK_SEEN: '/direct_v2/threads/{thread_id}/items/{item_id}/seen/',
-  GET_PRESENCE: '/direct_v2/get_presence/',
-  USER_INFO: '/users/{user_id}/info/',
-  USER_SEARCH: '/users/search/',
-  FRIENDSHIP: '/friendships/show/{user_id}/',
-  FOLLOW: '/friendships/create/{user_id}/',
-  UNFOLLOW: '/friendships/destroy/{user_id}/',
-  BLOCK: '/friendships/block/{user_id}/',
-  UNBLOCK: '/friendships/unblock/{user_id}/',
-  TIMELINE: '/feed/timeline/',
-  USER_FEED: '/feed/user/{user_id}/',
-  STORY_FEED: '/feed/reels_tray/',
-  STORY_MEDIA: '/feed/user/{user_id}/story/',
-  LIKE_MEDIA: '/media/{media_id}/like/',
-  UNLIKE_MEDIA: '/media/{media_id}/unlike/',
-  SAVE_MEDIA: '/media/{media_id}/save/',
-  UNSAVE_MEDIA: '/media/{media_id}/unsave/',
-  COMMENT: '/media/{media_id}/comment/',
-  DELETE_COMMENT: '/media/{media_id}/comment/{comment_id}/delete/',
-  REALTIME: '/push/register/'
-};
+/**
+ * Create HTTP client with cookie jar support
+ */
+function createHttpClient(session, options = {}) {
+  const jar = session.cookieJar;
+  const client = wrapper(axios.create({
+    jar,
+    withCredentials: true,
+    timeout: options.timeout || 30000,
+    headers: session.getHeaders()
+  }));
 
-// Default device settings (Android)
-const DEFAULT_DEVICE = {
-  manufacturer: 'samsung',
-  model: 'SM-G998B',
-  android_version: 31,
-  android_release: '12',
-  dpi: '560dpi',
-  resolution: '1440x3200',
-  device: 'p3s'
-};
+  // Add request interceptor to update headers (especially cookies)
+  client.interceptors.request.use(config => {
+    config.headers['Cookie'] = session.getCookieString(config.url);
+    if (session.csrfToken) {
+        config.headers['X-CSRFToken'] = session.csrfToken;
+    }
+    return config;
+  });
+
+  // Add response interceptor for debugging
+  client.interceptors.response.use(
+    response => response,
+    error => {
+      if (error.response) {
+        log.debug(`API Error ${error.response.status}: ${error.config.url}`, {
+            data: error.response.data
+        });
+      }
+      return Promise.reject(error);
+    }
+  );
+
+  return client;
+}
 
 /**
  * Main login function
@@ -188,9 +170,18 @@ async function loginWithAppState(appState, session, httpClient, options) {
         username: session.username,
         user: user
       };
+    } else if (session.userId && session.isLoggedIn) {
+        // Fallback: If we have userId from cookies and the request didn't fail with 401/403
+        log.warn('Validation returned unexpected data, but session appears active via cookies.');
+        return {
+            success: true,
+            userId: session.userId,
+            username: session.username || 'unknown',
+            user: response.data || {}
+        };
     }
-console.log("DEBUG: current_user response", response.status, response.data);
 
+    log.debug("Validation failed", { status: response.status, data: response.data });
     throw new Error('Invalid appState - session expired or invalid');
 
   } catch (error) {
