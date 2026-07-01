@@ -11,26 +11,32 @@ function createDualFca(nkxica, experimentalFca = null) {
   const handler = {
     get(target, prop) {
       // Methods that support fallback
-      const fallbackMethods = ['sendMessage', 'sendPhoto', 'sendVideo'];
+      const fallbackMethods = [
+          'sendMessage', 'sendPhoto', 'sendVideo', 'getUserInfo',
+          'getThreadInfo', 'getThreadList', 'sendPhotoFromUrl',
+          'sendVideoFromUrl', 'sendAudioFromUrl'
+      ];
 
       if (fallbackMethods.includes(prop) && experimentalFca) {
         return async (...args) => {
-          let mediaType = 'text';
-          if (prop === 'sendPhoto') mediaType = 'image';
-          if (prop === 'sendVideo') mediaType = 'video';
-
-          const isFallbackEnabled = config.USE_FCA_FALLBACK?.[mediaType] || false;
-
           try {
             // Always try primary (nkxica) first
-            return await target[prop](...args);
+            if (typeof target[prop] === 'function') {
+                return await target[prop](...args);
+            }
+            throw new Error(`Method ${prop} not found on primary API`);
           } catch (error) {
-            if (isFallbackEnabled && experimentalFca) {
+            const isFallbackEnabled = config.USE_FCA_FALLBACK?.all || false;
+
+            if (isFallbackEnabled && experimentalFca && typeof experimentalFca[prop] === 'function') {
               logger.warn(`Primary FCA (nkxica) failed on ${prop}, attempting fallback to Instagram-FCA...`, { error: error.message });
               try {
-                // Adapt args if necessary: Instagram-FCA's sendPhoto expects (stream/path, threadID)
-                // nkxica's wrapped sendMessage expects ({ body, attachment }, threadID) or similar
-                // We'll need to normalize these calls in the bot.
+                // Logic for FromUrl fallbacks if experimental doesn't have them
+                if (prop.endsWith('FromUrl') && !experimentalFca[prop]) {
+                    const type = prop.replace('send', '').replace('FromUrl', '').toLowerCase();
+                    if (type === 'photo' && experimentalFca.sendPhoto) return await experimentalFca.sendPhoto(args[1], args[0]);
+                    if (type === 'video' && experimentalFca.sendVideo) return await experimentalFca.sendVideo(args[1], args[0]);
+                }
                 return await experimentalFca[prop](...args);
               } catch (fallbackError) {
                 logger.error(`Fallback FCA (Instagram-FCA) also failed on ${prop}`, { error: fallbackError.message });
@@ -44,7 +50,16 @@ function createDualFca(nkxica, experimentalFca = null) {
 
       // Default to primary for everything else
       const value = target[prop];
-      return typeof value === 'function' ? value.bind(target) : value;
+      if (typeof value === 'function') return value.bind(target);
+
+      // If prop doesn't exist on target, check experimental
+      if (typeof value === 'undefined' && experimentalFca) {
+          const expValue = experimentalFca[prop];
+          if (typeof expValue === 'function') return expValue.bind(experimentalFca);
+          return expValue;
+      }
+
+      return value;
     }
   };
 

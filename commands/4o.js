@@ -3,7 +3,7 @@ const axios = require("axios");
 module.exports = {
   config: {
     name: "4o",
-    aliases: ["gpt4"],
+    aliases: ["gpt4", "ai", "ask"],
     version: "1.0",
     author: "NTKhang",
     cooldown: 5,

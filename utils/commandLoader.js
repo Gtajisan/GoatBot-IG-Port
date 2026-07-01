@@ -9,14 +9,17 @@ class CommandLoader {
     this.aliases = new Map();
     this.cooldowns = new Map();
 
-    // Bridge for GoatBot V2 global access
     global.GoatBot = global.GoatBot || {};
     global.GoatBot.commands = this.commands;
     global.GoatBot.aliases = this.aliases;
-    global.GoatBot.onReply = new Map();
-    global.GoatBot.onReaction = new Map();
-    global.GoatBot.onEvent = new Map();
+    global.GoatBot.onReply = global.GoatBot.onReply || new Map();
+    global.GoatBot.onReaction = global.GoatBot.onReaction || new Map();
+    global.GoatBot.onEvent = global.GoatBot.onEvent || [];
     global.client = global.client || {};
+  }
+
+  async loadAll() {
+      await this.loadCommands();
   }
 
   async loadCommands() {
@@ -38,27 +41,12 @@ class CommandLoader {
         this.commands.set(cmd.config.name.toLowerCase(), cmd);
         if (cmd.config.aliases) {
             cmd.config.aliases.forEach(a => {
-                this.aliases.set(a.toLowerCase(), cmd.config.name.toLowerCase());
-                this.commands.set(a.toLowerCase(), cmd);
+                const alias = a.toLowerCase();
+                this.aliases.set(alias, cmd.config.name.toLowerCase());
+                // For direct lookup in the Map
+                this.commands.set(alias, cmd);
             });
         }
-
-        // Support onLoad for GoatBot V2 commands
-        if (typeof cmd.onLoad === 'function') {
-            try {
-                cmd.onLoad({
-                    api: global.GoatBot.fcaApi,
-                    bot: global.GoatBot.instance, // Will be set later
-                    database: require('./database'),
-                    usersData: require('./database').usersData,
-                    threadsData: require('./database').threadsData
-                });
-            } catch (e) {
-                logger.error(`Error in onLoad of ${cmd.config.name}`, { error: e.message });
-            }
-        }
-
-        logger.info(`Loaded: ${cmd.config.name}`);
       } catch (e) { logger.error(`Failed to load ${file}`, { error: e.message }); }
     }
     logger.info(`Successfully loaded ${this.commands.size} command triggers`);

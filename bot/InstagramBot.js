@@ -7,13 +7,10 @@ const createDualFca = require('./DualFca');
 const fs = require('fs-extra');
 const path = require('path');
 const http = require('http');
-const cron = require('node-cron');
-const axios = require('axios');
 const config = require('../config');
 const logger = require('../utils/logger');
 const CommandLoader = require('../utils/commandLoader');
 const EventLoader   = require('../utils/eventLoader');
-const Banner        = require('../utils/banner');
 
 class InstagramBot {
   constructor() {
@@ -32,7 +29,7 @@ class InstagramBot {
     global.GoatBot = {
         config: config,
         commands: this.commandLoader.commands,
-        aliases: new Map(), // Populated by CommandLoader
+        aliases: this.commandLoader.aliases,
         onReply: new Map(),
         onReaction: new Map(),
         onEvent: [],
@@ -41,7 +38,7 @@ class InstagramBot {
     };
 
     global.utils = require('../utils.js');
-    global.api = null; // Will be set after login
+    global.api = null;
   }
 
   async start() {
@@ -61,7 +58,6 @@ class InstagramBot {
       this._scheduleAutoUptime();
       this.isRunning = true;
 
-      // Trigger ready event
       this.eventLoader.handleEvent('ready', this);
 
     } catch (error) {
@@ -75,18 +71,31 @@ class InstagramBot {
   }
 
   async loadAndLogin() {
-    const hasCookieFile   = fs.existsSync(config.ACCOUNT_FILE);
-    const cookieContent   = hasCookieFile ? fs.readFileSync(config.ACCOUNT_FILE, 'utf-8') : '';
+    let credentials = config.ACCOUNT_COOKIES;
 
-    if (!cookieContent) throw new Error('No cookies found in account.txt');
+    if (!credentials && fs.existsSync(config.ACCOUNT_FILE)) {
+        credentials = fs.readFileSync(config.ACCOUNT_FILE, 'utf-8');
+    }
+
+    if (!credentials && config.ACCOUNT_EMAIL && config.ACCOUNT_PASSWORD) {
+        credentials = {
+            email: config.ACCOUNT_EMAIL,
+            password: config.ACCOUNT_PASSWORD,
+            twoFactorSecret: config.ACCOUNT_2FA_SECRET
+        };
+    }
+
+    if (!credentials) {
+        throw new Error('No credentials found. Please provide IG_COOKIES or set up account.txt / EMAIL & PASSWORD.');
+    }
 
     logger.info('Logging in with nkxica (Primary)...');
-    this.ig = await login(cookieContent);
+    this.ig = await login(credentials);
 
     if (config.EXPERIMENTAL_FCA_ENABLE) {
         try {
             logger.info('Logging in with Instagram-FCA (Experimental)...');
-            this.experimentalFca = await loginFca(cookieContent);
+            this.experimentalFca = await loginFca(credentials);
         } catch (e) {
             logger.warn('Instagram-FCA login failed, continuing with nkxica only.');
         }
@@ -107,14 +116,12 @@ class InstagramBot {
 
     this.username = this.userID;
 
-    // Create the dual-path API wrapper
     const nkxicaWrapper = this.createAPIWrapper();
     this.api = createDualFca(nkxicaWrapper, this.experimentalFca);
 
     global.GoatBot.fcaApi = this.api;
     global.api = this.api;
 
-    // Load commands onLoad
     const database = require('../utils/database');
     for (const [name, cmd] of this.commandLoader.commands) {
         if (typeof cmd.onLoad === 'function') {
@@ -135,20 +142,60 @@ class InstagramBot {
 
   createAPIWrapper() {
     const ig = this.ig;
+    const self = this;
+    const axios = require('axios');
+
     return {
       sendMessage: async (form, threadID, callback, replyToMessageID) => {
-          return await ig.sendMessage(form, threadID, callback, replyToMessageID);
+          let finalForm = form;
+          let finalThreadID = threadID;
+          let finalReplyID = replyToMessageID;
+
+          if (typeof form === 'string' && typeof threadID !== 'undefined') {
+              finalForm = { body: form };
+          }
+
+          try {
+              const res = await ig.sendMessage(finalForm, finalThreadID, null, finalReplyID);
+              if (callback) callback(null, res);
+              return res;
+          } catch (e) {
+              if (callback) callback(e);
+              throw e;
+          }
       },
       getUserInfo: async (id) => await ig.getUserInfo(id),
       getUserInfoByUsername: async (username) => await ig.getUserInfoByUsername(username),
       getThreadInfo: async (id) => await ig.getThreadInfo(id),
       getThreadList: async (limit, folder) => await ig.getThreadList(limit, folder),
-      getCurrentUserID: () => this.userID,
+      getCurrentUserID: () => self.userID,
       unsendMessage: async (id) => await ig.unsendMessage(id),
       setMessageReaction: async (emoji, id) => await ig.sendReaction(emoji, id),
       changeNickname: async (name, threadID, userID) => {
           if (typeof ig.changeNickname === 'function') return await ig.changeNickname(name, threadID, userID);
           return true;
+      },
+      addUserToThread: async (userID, threadID) => {
+          if (typeof ig.addUserToThread === 'function') return await ig.addUserToThread(userID, threadID);
+          return true;
+      },
+      removeUserFromThread: async (userID, threadID) => {
+          if (typeof ig.removeUserFromThread === 'function') return await ig.removeUserFromThread(userID, threadID);
+          return true;
+      },
+      setThreadName: async (name, threadID) => {
+          if (typeof ig.setThreadName === 'function') return await ig.setThreadName(name, threadID);
+          return true;
+      },
+      markAsRead: async (threadID) => await ig.markAsRead(threadID),
+      sendPhotoFromUrl: async (threadID, url, body = "", replyToID = null) => {
+          return await ig.sendMessage({ body, attachment: [{ type: 'photo', url }] }, threadID, null, replyToID);
+      },
+      sendVideoFromUrl: async (threadID, url, body = "", replyToID = null) => {
+          return await ig.sendMessage({ body, attachment: [{ type: 'video', url }] }, threadID, null, replyToID);
+      },
+      sendAudioFromUrl: async (threadID, url, body = "", replyToID = null) => {
+          return await ig.sendMessage({ body, attachment: [{ type: 'audio', url }] }, threadID, null, replyToID);
       }
     };
   }
@@ -169,12 +216,37 @@ class InstagramBot {
 
   scheduleReconnect() {
       this.reconnectAttempts++;
-      setTimeout(() => this.start(), 5000);
+      const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+      logger.info(`Scheduling reconnect in ${delay/1000}s...`);
+      setTimeout(() => this.start(), delay);
   }
 
   keepAlive() {
       process.on('SIGINT', () => process.exit(0));
       process.on('SIGTERM', () => process.exit(0));
+  }
+
+  _scheduleAutoRestart() {
+      if (config.AUTO_RESTART_TIME) {
+          const cron = require('node-cron');
+          cron.schedule(config.AUTO_RESTART_TIME, () => {
+              logger.info('Auto-restarting bot...');
+              process.exit(1);
+          });
+      }
+  }
+
+  _scheduleAutoUptime() {
+      if (config.AUTO_UPTIME_ENABLE && config.AUTO_UPTIME_URL) {
+          const axios = require('axios');
+          setInterval(async () => {
+              try {
+                  await axios.get(config.AUTO_UPTIME_URL);
+              } catch (e) {
+                  // ignore
+              }
+          }, config.AUTO_UPTIME_INTERVAL * 1000);
+      }
   }
 }
 
