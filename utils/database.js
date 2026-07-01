@@ -113,7 +113,7 @@ class Database {
     return {
       users: {}, threads: {}, stats: {}, economy: {}, global: {},
       reminders: [], autoResponses: [],
-      welcomedUsers: new Set(), bannedUsers: new Set(),
+      welcomedUsers: new Set(), bannedUsers: new Set(), bannedThreads: new Set(),
       spamWarnings: {}, lastMessages: {}, sentMessages: {}, processedMessages: {},
       replyHandlers: {}, reactionHandlers: {},
       autoRemoveMessages: []
@@ -125,7 +125,7 @@ class Database {
       users: d.users || {}, threads: d.threads || {}, stats: d.stats || {},
       economy: d.economy || {}, reminders: d.reminders || [], autoResponses: d.autoResponses || [],
       global: d.global || {},
-      welcomedUsers: new Set(d.welcomedUsers || []), bannedUsers: new Set(d.bannedUsers || []),
+      welcomedUsers: new Set(d.welcomedUsers || []), bannedUsers: new Set(d.bannedUsers || []), bannedThreads: new Set(d.bannedThreads || []),
       spamWarnings: d.spamWarnings || {}, lastMessages: d.lastMessages || {},
       sentMessages: d.sentMessages || {}, processedMessages: d.processedMessages || {},
       replyHandlers: d.replyHandlers || {}, reactionHandlers: d.reactionHandlers || {},
@@ -137,7 +137,7 @@ class Database {
     return {
         ...this.data,
         welcomedUsers: [...this.data.welcomedUsers],
-        bannedUsers: [...this.data.bannedUsers]
+        bannedUsers: [...this.data.bannedUsers], bannedThreads: [...this.data.bannedThreads]
     };
   }
 
@@ -235,6 +235,11 @@ class Database {
   isBanned(uid) { return this.data.bannedUsers.has(String(uid)); }
   banUser(uid)  { this.data.bannedUsers.add(String(uid)); logger.info(`User ${uid} banned`); }
   unbanUser(uid){ this.data.bannedUsers.delete(String(uid)); logger.info(`User ${uid} unbanned`); }
+
+  isUserBanned(uid) { return this.isBanned(uid); }
+  isThreadBanned(tid) { return this.data.bannedThreads.has(String(tid)); }
+  banThread(tid)  { this.data.bannedThreads.add(String(tid)); logger.info(`Thread ${tid} banned`); }
+  unbanThread(tid){ this.data.bannedThreads.delete(String(tid)); logger.info(`Thread ${tid} unbanned`); }
 
   getThreadData(tid) {
     if (!this.data.threads[tid]) {

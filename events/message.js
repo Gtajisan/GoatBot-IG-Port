@@ -13,11 +13,13 @@ module.exports = {
     description: 'Main message handler'
   },
   async run({ api, event, bot, database }) {
+    logger.debug(`Incoming message from ${event.senderID} in ${event.threadId}: ${event.body}`);
     try {
       const { commandLoader } = bot;
 
       // 1. Check if user/thread is banned
       if (database.isUserBanned(event.senderID) || database.isThreadBanned(event.threadId)) {
+          logger.debug(`Ignoring message from banned user ${event.senderID} or thread ${event.threadId}`);
           return;
       }
 

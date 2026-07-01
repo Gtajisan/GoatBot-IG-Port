@@ -14,7 +14,7 @@ function createDualFca(primary, secondary = null) {
       const fallbackMethods = [
           'sendMessage', 'sendPhoto', 'sendVideo', 'getUserInfo',
           'getThreadInfo', 'getThreadList', 'sendPhotoFromUrl',
-          'sendVideoFromUrl', 'sendAudioFromUrl'
+          'sendVideoFromUrl', 'sendAudioFromUrl', 'unsendMessage', 'setMessageReaction', 'markAsRead', 'sendTypingIndicator'
       ];
 
       if (fallbackMethods.includes(prop) && secondary) {
@@ -26,7 +26,17 @@ function createDualFca(primary, secondary = null) {
             }
             throw new Error(`Method ${prop} not found on primary API`);
           } catch (error) {
-            const isFallbackEnabled = config.USE_FCA_FALLBACK?.all || config.USE_FCA_FALLBACK?.[prop.replace('send', '').toLowerCase()] || false;
+            const fcaConfig = config.USE_FCA_FALLBACK || {};
+            const methodKey = prop.replace('send', '').toLowerCase();
+            const isFallbackEnabled = fcaConfig.all ||
+                                    fcaConfig[methodKey] ||
+                                    (methodKey === 'message' && fcaConfig.text) ||
+                                    (methodKey === 'photo' && fcaConfig.image) ||
+                                    (methodKey === 'photofromurl' && fcaConfig.image) ||
+                                    (methodKey === 'video' && fcaConfig.video) ||
+                                    (methodKey === 'videofromurl' && fcaConfig.video) ||
+                                    (methodKey === 'audiofromurl' && fcaConfig.audio) ||
+                                    false;
 
             if (isFallbackEnabled && secondary && typeof secondary[prop] === 'function') {
               logger.warn(`Primary FCA failed on ${prop}, attempting fallback to secondary...`, { error: error.message });
