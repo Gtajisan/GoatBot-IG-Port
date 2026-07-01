@@ -143,6 +143,7 @@ module.exports = {
   })(),
 
   ACCOUNT_FILE:  process.env.ACCOUNT_FILE || './account.txt',
+  ACCOUNT_COOKIES: process.env.IG_COOKIES || process.env.ACCOUNT_COOKIES || "",
   COMMANDS_PATH: './commands',
   EVENTS_PATH:   './events',
   LOGS_PATH:     './storage/logs',

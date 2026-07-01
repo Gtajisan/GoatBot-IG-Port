@@ -28,9 +28,15 @@ function createDualFca(nkxica, experimentalFca = null) {
             if (isFallbackEnabled && experimentalFca) {
               logger.warn(`Primary FCA (nkxica) failed on ${prop}, attempting fallback to Instagram-FCA...`, { error: error.message });
               try {
-                // Adapt args if necessary: Instagram-FCA's sendPhoto expects (stream/path, threadID)
-                // nkxica's wrapped sendMessage expects ({ body, attachment }, threadID) or similar
-                // We'll need to normalize these calls in the bot.
+                // Many commands call sendMessage({body, attachment}, threadID)
+                if (prop === 'sendMessage' && typeof args[0] === 'object' && args[0].attachment && !experimentalFca.sendMessageWithAttachment) {
+                     if (Array.isArray(args[0].attachment)) {
+                         const first = args[0].attachment[0];
+                         if (first.type === 'photo' && experimentalFca.sendPhoto) {
+                             return await experimentalFca.sendPhoto(first.url, args[1]);
+                         }
+                     }
+                }
                 return await experimentalFca[prop](...args);
               } catch (fallbackError) {
                 logger.error(`Fallback FCA (Instagram-FCA) also failed on ${prop}`, { error: fallbackError.message });
@@ -44,7 +50,16 @@ function createDualFca(nkxica, experimentalFca = null) {
 
       // Default to primary for everything else
       const value = target[prop];
-      return typeof value === 'function' ? value.bind(target) : value;
+      if (typeof value === 'function') return value.bind(target);
+
+      // If prop doesn't exist on target, check experimental
+      if (typeof value === 'undefined' && experimentalFca) {
+          const expValue = experimentalFca[prop];
+          if (typeof expValue === 'function') return expValue.bind(experimentalFca);
+          return expValue;
+      }
+
+      return value;
     }
   };
 
