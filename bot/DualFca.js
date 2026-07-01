@@ -11,31 +11,31 @@ function createDualFca(nkxica, experimentalFca = null) {
   const handler = {
     get(target, prop) {
       // Methods that support fallback
-      const fallbackMethods = ['sendMessage', 'sendPhoto', 'sendVideo'];
+      const fallbackMethods = [
+          'sendMessage', 'sendPhoto', 'sendVideo', 'getUserInfo',
+          'getThreadInfo', 'getThreadList', 'sendPhotoFromUrl',
+          'sendVideoFromUrl', 'sendAudioFromUrl'
+      ];
 
       if (fallbackMethods.includes(prop) && experimentalFca) {
         return async (...args) => {
-          let mediaType = 'text';
-          if (prop === 'sendPhoto') mediaType = 'image';
-          if (prop === 'sendVideo') mediaType = 'video';
-
-          const isFallbackEnabled = config.USE_FCA_FALLBACK?.[mediaType] || false;
-
           try {
             // Always try primary (nkxica) first
-            return await target[prop](...args);
+            if (typeof target[prop] === 'function') {
+                return await target[prop](...args);
+            }
+            throw new Error(`Method ${prop} not found on primary API`);
           } catch (error) {
-            if (isFallbackEnabled && experimentalFca) {
+            const isFallbackEnabled = config.USE_FCA_FALLBACK?.all || false;
+
+            if (isFallbackEnabled && experimentalFca && typeof experimentalFca[prop] === 'function') {
               logger.warn(`Primary FCA (nkxica) failed on ${prop}, attempting fallback to Instagram-FCA...`, { error: error.message });
               try {
-                // Many commands call sendMessage({body, attachment}, threadID)
-                if (prop === 'sendMessage' && typeof args[0] === 'object' && args[0].attachment && !experimentalFca.sendMessageWithAttachment) {
-                     if (Array.isArray(args[0].attachment)) {
-                         const first = args[0].attachment[0];
-                         if (first.type === 'photo' && experimentalFca.sendPhoto) {
-                             return await experimentalFca.sendPhoto(first.url, args[1]);
-                         }
-                     }
+                // Logic for FromUrl fallbacks if experimental doesn't have them
+                if (prop.endsWith('FromUrl') && !experimentalFca[prop]) {
+                    const type = prop.replace('send', '').replace('FromUrl', '').toLowerCase();
+                    if (type === 'photo' && experimentalFca.sendPhoto) return await experimentalFca.sendPhoto(args[1], args[0]);
+                    if (type === 'video' && experimentalFca.sendVideo) return await experimentalFca.sendVideo(args[1], args[0]);
                 }
                 return await experimentalFca[prop](...args);
               } catch (fallbackError) {

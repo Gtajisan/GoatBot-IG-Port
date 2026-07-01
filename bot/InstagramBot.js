@@ -29,7 +29,7 @@ class InstagramBot {
     global.GoatBot = {
         config: config,
         commands: this.commandLoader.commands,
-        aliases: new Map(),
+        aliases: this.commandLoader.aliases,
         onReply: new Map(),
         onReaction: new Map(),
         onEvent: [],
@@ -142,9 +142,11 @@ class InstagramBot {
 
   createAPIWrapper() {
     const ig = this.ig;
+    const self = this;
+    const axios = require('axios');
+
     return {
       sendMessage: async (form, threadID, callback, replyToMessageID) => {
-          // Normalize FCA-style (message, threadID) to nkxica-style
           let finalForm = form;
           let finalThreadID = threadID;
           let finalReplyID = replyToMessageID;
@@ -166,12 +168,34 @@ class InstagramBot {
       getUserInfoByUsername: async (username) => await ig.getUserInfoByUsername(username),
       getThreadInfo: async (id) => await ig.getThreadInfo(id),
       getThreadList: async (limit, folder) => await ig.getThreadList(limit, folder),
-      getCurrentUserID: () => this.userID,
+      getCurrentUserID: () => self.userID,
       unsendMessage: async (id) => await ig.unsendMessage(id),
       setMessageReaction: async (emoji, id) => await ig.sendReaction(emoji, id),
       changeNickname: async (name, threadID, userID) => {
           if (typeof ig.changeNickname === 'function') return await ig.changeNickname(name, threadID, userID);
           return true;
+      },
+      addUserToThread: async (userID, threadID) => {
+          if (typeof ig.addUserToThread === 'function') return await ig.addUserToThread(userID, threadID);
+          return true;
+      },
+      removeUserFromThread: async (userID, threadID) => {
+          if (typeof ig.removeUserFromThread === 'function') return await ig.removeUserFromThread(userID, threadID);
+          return true;
+      },
+      setThreadName: async (name, threadID) => {
+          if (typeof ig.setThreadName === 'function') return await ig.setThreadName(name, threadID);
+          return true;
+      },
+      markAsRead: async (threadID) => await ig.markAsRead(threadID),
+      sendPhotoFromUrl: async (threadID, url, body = "", replyToID = null) => {
+          return await ig.sendMessage({ body, attachment: [{ type: 'photo', url }] }, threadID, null, replyToID);
+      },
+      sendVideoFromUrl: async (threadID, url, body = "", replyToID = null) => {
+          return await ig.sendMessage({ body, attachment: [{ type: 'video', url }] }, threadID, null, replyToID);
+      },
+      sendAudioFromUrl: async (threadID, url, body = "", replyToID = null) => {
+          return await ig.sendMessage({ body, attachment: [{ type: 'audio', url }] }, threadID, null, replyToID);
       }
     };
   }

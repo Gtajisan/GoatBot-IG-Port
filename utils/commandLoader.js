@@ -9,7 +9,6 @@ class CommandLoader {
     this.aliases = new Map();
     this.cooldowns = new Map();
 
-    // Bridge for GoatBot V2 global access
     global.GoatBot = global.GoatBot || {};
     global.GoatBot.commands = this.commands;
     global.GoatBot.aliases = this.aliases;
@@ -42,8 +41,10 @@ class CommandLoader {
         this.commands.set(cmd.config.name.toLowerCase(), cmd);
         if (cmd.config.aliases) {
             cmd.config.aliases.forEach(a => {
-                this.aliases.set(a.toLowerCase(), cmd.config.name.toLowerCase());
-                this.commands.set(a.toLowerCase(), cmd);
+                const alias = a.toLowerCase();
+                this.aliases.set(alias, cmd.config.name.toLowerCase());
+                // For direct lookup in the Map
+                this.commands.set(alias, cmd);
             });
         }
       } catch (e) { logger.error(`Failed to load ${file}`, { error: e.message }); }
