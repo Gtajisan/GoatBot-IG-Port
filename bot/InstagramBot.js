@@ -1,6 +1,6 @@
 'use strict';
 
-const { login } = require('@neoaz07/nkxica');
+const loginNkxica = require('@neoaz07/nkxica').login;
 const loginFca = require('./instagram-fca/login-wrapper');
 const createDualFca = require('./DualFca');
 
@@ -14,8 +14,8 @@ const EventLoader   = require('../utils/eventLoader');
 
 class InstagramBot {
   constructor() {
-    this.ig = null;
-    this.experimentalFca = null;
+    this.fca = null;
+    this.nkxica = null;
     this.api = null;
     this.userID = null;
     this.username = null;
@@ -89,15 +89,20 @@ class InstagramBot {
         throw new Error('No credentials found. Please provide IG_COOKIES or set up account.txt / EMAIL & PASSWORD.');
     }
 
-    logger.info('Logging in with nkxica (Primary)...');
-    this.ig = await login(credentials);
+    logger.info('Logging in with Instagram-FCA (Primary)...');
+    try {
+        this.fca = await loginFca(credentials, config.OPTIONS_FCA);
+    } catch (e) {
+        logger.error('Instagram-FCA login failed', { error: e.message });
+        throw e;
+    }
 
     if (config.EXPERIMENTAL_FCA_ENABLE) {
         try {
-            logger.info('Logging in with Instagram-FCA (Experimental)...');
-            this.experimentalFca = await loginFca(credentials);
+            logger.info('Logging in with nkxica (Fallback)...');
+            this.nkxica = await loginNkxica(credentials);
         } catch (e) {
-            logger.warn('Instagram-FCA login failed, continuing with nkxica only.');
+            logger.warn('nkxica login failed, continuing with Instagram-FCA only.');
         }
     }
 
@@ -106,21 +111,37 @@ class InstagramBot {
 
   _afterLogin() {
     try {
-      const idResult = this.ig.getCurrentUserID();
-      this.userID = typeof idResult === 'object'
-        ? (idResult.userID || idResult.userId || String(idResult))
-        : String(idResult);
+      this.userID = String(this.fca.getCurrentUserID());
+      this.username = this.fca.currentUsername || this.userID;
     } catch (e) {
       this.userID = 'unknown';
+      this.username = 'unknown';
     }
 
-    this.username = this.userID;
+    const nkxicaWrapper = this.nkxica ? this.createNkxicaWrapper() : null;
+    // For now, we use FCA as primary directly or through DualFca if nkxica is enabled
+    // If nkxica is fallback, we swap the order in DualFca or just use FCA
+    this.api = this.fca;
 
-    const nkxicaWrapper = this.createAPIWrapper();
-    this.api = createDualFca(nkxicaWrapper, this.experimentalFca);
+    if (nkxicaWrapper) {
+        // If we wanted to use DualFca with FCA as primary:
+        // this.api = createDualFca(this.fca, nkxicaWrapper);
+        // But DualFca was designed with nkxica as target and fca as fallback.
+        // Let's keep it simple for now and use FCA as primary.
+    }
 
     global.GoatBot.fcaApi = this.api;
     global.api = this.api;
+
+    // Start listening
+    this.api.listen((err, event) => {
+        if (err) return logger.error('Listen error', { error: err.message });
+        if (!event) return;
+
+        // Normalize event for GoatBot
+        const normalizedEvent = this.normalizeEvent(event);
+        this.eventLoader.handleEvent(normalizedEvent.type, normalizedEvent);
+    });
 
     const database = require('../utils/database');
     for (const [name, cmd] of this.commandLoader.commands) {
@@ -140,23 +161,34 @@ class InstagramBot {
     }
   }
 
-  createAPIWrapper() {
-    const ig = this.ig;
+  normalizeEvent(event) {
+      // Ensure threadID and senderID are present and strings
+      const normalized = { ...event };
+      if (normalized.thread_id) normalized.threadID = String(normalized.thread_id);
+      if (normalized.threadID) normalized.threadID = String(normalized.threadID);
+
+      if (normalized.user_id) normalized.senderID = String(normalized.user_id);
+      if (normalized.senderID) normalized.senderID = String(normalized.senderID);
+
+      if (normalized.item_id) normalized.messageID = String(normalized.item_id);
+      if (normalized.messageID) normalized.messageID = String(normalized.messageID);
+
+      // Map GoatBot specific fields if needed
+      normalized.threadId = normalized.threadID;
+
+      return normalized;
+  }
+
+  createNkxicaWrapper() {
+    const ig = this.nkxica;
     const self = this;
-    const axios = require('axios');
 
     return {
       sendMessage: async (form, threadID, callback, replyToMessageID) => {
           let finalForm = form;
-          let finalThreadID = threadID;
-          let finalReplyID = replyToMessageID;
-
-          if (typeof form === 'string' && typeof threadID !== 'undefined') {
-              finalForm = { body: form };
-          }
-
+          if (typeof form === 'string') finalForm = { body: form };
           try {
-              const res = await ig.sendMessage(finalForm, finalThreadID, null, finalReplyID);
+              const res = await ig.sendMessage(finalForm, threadID, null, replyToMessageID);
               if (callback) callback(null, res);
               return res;
           } catch (e) {
@@ -165,38 +197,9 @@ class InstagramBot {
           }
       },
       getUserInfo: async (id) => await ig.getUserInfo(id),
-      getUserInfoByUsername: async (username) => await ig.getUserInfoByUsername(username),
-      getThreadInfo: async (id) => await ig.getThreadInfo(id),
-      getThreadList: async (limit, folder) => await ig.getThreadList(limit, folder),
-      getCurrentUserID: () => self.userID,
       unsendMessage: async (id) => await ig.unsendMessage(id),
       setMessageReaction: async (emoji, id) => await ig.sendReaction(emoji, id),
-      changeNickname: async (name, threadID, userID) => {
-          if (typeof ig.changeNickname === 'function') return await ig.changeNickname(name, threadID, userID);
-          return true;
-      },
-      addUserToThread: async (userID, threadID) => {
-          if (typeof ig.addUserToThread === 'function') return await ig.addUserToThread(userID, threadID);
-          return true;
-      },
-      removeUserFromThread: async (userID, threadID) => {
-          if (typeof ig.removeUserFromThread === 'function') return await ig.removeUserFromThread(userID, threadID);
-          return true;
-      },
-      setThreadName: async (name, threadID) => {
-          if (typeof ig.setThreadName === 'function') return await ig.setThreadName(name, threadID);
-          return true;
-      },
-      markAsRead: async (threadID) => await ig.markAsRead(threadID),
-      sendPhotoFromUrl: async (threadID, url, body = "", replyToID = null) => {
-          return await ig.sendMessage({ body, attachment: [{ type: 'photo', url }] }, threadID, null, replyToID);
-      },
-      sendVideoFromUrl: async (threadID, url, body = "", replyToID = null) => {
-          return await ig.sendMessage({ body, attachment: [{ type: 'video', url }] }, threadID, null, replyToID);
-      },
-      sendAudioFromUrl: async (threadID, url, body = "", replyToID = null) => {
-          return await ig.sendMessage({ body, attachment: [{ type: 'audio', url }] }, threadID, null, replyToID);
-      }
+      markAsRead: async (threadID) => await ig.markAsRead(threadID)
     };
   }
 
