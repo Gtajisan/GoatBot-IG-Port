@@ -148,6 +148,7 @@
   "global": {},
   "welcomedUsers": [],
   "bannedUsers": [],
+  "bannedThreads": [],
   "spamWarnings": {},
   "lastMessages": {},
   "sentMessages": {

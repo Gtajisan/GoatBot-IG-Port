@@ -123,8 +123,20 @@ class InstagramBot {
     if (!primary) throw new Error('No API instance available after login.');
 
     try {
-      this.userID = String(primary.getCurrentUserID ? primary.getCurrentUserID() : (primary.userID || primary.id || 'unknown'));
-      this.username = primary.currentUsername || this.userID;
+      const getVal = (v) => (v && typeof v === 'object') ? (v.pk || v.id || v.userId || v.uid || JSON.stringify(v)) : v;
+
+      let rawID = 'unknown';
+      if (primary.getCurrentUserID) rawID = primary.getCurrentUserID();
+      else rawID = primary.userID || primary.id || (primary.session && (primary.session.userId || primary.session.pk)) || (primary.viewer && (primary.viewer.pk || primary.viewer.id)) || 'unknown';
+
+      this.userID = String(getVal(rawID));
+
+      let rawUsername = this.userID;
+      rawUsername = primary.currentUsername || primary.username || (primary.session && primary.session.username) || (primary.viewer && primary.viewer.username) || this.userID;
+
+      this.username = String(getVal(rawUsername));
+
+      if (this.username === '[object Object]') this.username = this.userID;
     } catch (e) {
       this.userID = 'unknown';
       this.username = 'unknown';
@@ -178,16 +190,28 @@ class InstagramBot {
 
   normalizeEvent(event) {
       const normalized = { ...event };
-      if (normalized.thread_id) normalized.threadID = String(normalized.thread_id);
-      if (normalized.threadID) normalized.threadID = String(normalized.threadID);
 
-      if (normalized.user_id) normalized.senderID = String(normalized.user_id);
-      if (normalized.senderID) normalized.senderID = String(normalized.senderID);
+      // Ensure threadID is always a string and present as threadID and threadId
+      const tid = normalized.threadID || normalized.thread_id || normalized.threadId;
+      if (tid) {
+          normalized.threadID = String(tid);
+          normalized.threadId = String(tid);
+      }
 
-      if (normalized.item_id) normalized.messageID = String(normalized.item_id);
-      if (normalized.messageID) normalized.messageID = String(normalized.messageID);
+      // Ensure senderID is always a string
+      const sid = normalized.senderID || normalized.user_id || normalized.userId;
+      if (sid) {
+          normalized.senderID = String(sid);
+      }
 
-      normalized.threadId = normalized.threadID;
+      // Ensure messageID is always a string
+      const mid = normalized.messageID || normalized.item_id || normalized.itemId;
+      if (mid) {
+          normalized.messageID = String(mid);
+      }
+
+      // Handle body
+      normalized.body = normalized.body || normalized.text || '';
 
       return normalized;
   }
