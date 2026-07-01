@@ -41,6 +41,24 @@ class InstagramBot {
 
     global.utils = require('../utils.js');
     global.api = null;
+
+    this.setupProcessHandlers();
+  }
+
+  setupProcessHandlers() {
+      process.on('unhandledRejection', (reason, promise) => {
+          logger.error('Unhandled Rejection', { reason: reason?.stack || reason, promise });
+      });
+
+      process.on('uncaughtException', (error) => {
+          logger.error('Uncaught Exception', { error: error.stack || error });
+          // Optional: Reconnect or exit depending on severity
+          if (this.shouldReconnect) {
+              this.scheduleReconnect();
+          } else {
+              process.exit(1);
+          }
+      });
   }
 
   async start() {
@@ -48,6 +66,7 @@ class InstagramBot {
     this.keepAlive();
 
     try {
+      logger.info('Initializing bot components...');
       await this.commandLoader.loadAll();
       await this.eventLoader.loadAll();
 
@@ -60,6 +79,7 @@ class InstagramBot {
       this._scheduleAutoUptime();
       this.isRunning = true;
 
+      logger.success('Bot is now online and listening for events.');
       this.eventLoader.handleEvent('ready', this);
 
     } catch (error) {
@@ -98,13 +118,13 @@ class InstagramBot {
     logger.info('Logging in with nkxica (Primary)...');
     try {
         this.nkxica = await loginNkxica(credentials);
-        logger.info('nkxica login successful');
+        logger.success('nkxica login successful');
     } catch (e) {
-        logger.error('nkxica login failed', { error: e.message });
+        logger.warn('nkxica login failed', { error: e.message });
         logger.info('Attempting login with Instagram-FCA (Fallback)...');
         try {
             this.fca = await loginFca(credentials, config.OPTIONS_FCA);
-            logger.info('Instagram-FCA login successful');
+            logger.success('Instagram-FCA login successful');
         } catch (fcaErr) {
             logger.error('Instagram-FCA login failed', { error: fcaErr.message });
             throw e;
@@ -115,7 +135,7 @@ class InstagramBot {
         try {
             logger.info('Logging in with Instagram-FCA (Secondary)...');
             this.fca = await loginFca(credentials, config.OPTIONS_FCA);
-            logger.info('Instagram-FCA login successful');
+            logger.success('Instagram-FCA login successful');
         } catch (e) {
             logger.warn('Instagram-FCA login failed, continuing with nkxica only.');
         }
@@ -143,9 +163,12 @@ class InstagramBot {
       this.username = String(getVal(rawUsername));
 
       if (this.username === '[object Object]') this.username = this.userID;
+
+      logger.info(`Logged in as ${this.username} (${this.userID})`);
     } catch (e) {
       this.userID = 'unknown';
       this.username = 'unknown';
+      logger.warn('Failed to resolve account identity', { error: e.message });
     }
 
     const nkxicaWrapper = this.nkxica ? this.createNkxicaWrapper() : null;
@@ -162,7 +185,6 @@ class InstagramBot {
     this.api.listen((err, event) => {
         if (err) {
             logger.error('Listen error', { error: err.message });
-            // If the listener has a fatal error, we schedule a reconnect
             if (this.isRunning && this.shouldReconnect) {
                 logger.warn('Fatal listen error detected. Restarting bot...');
                 this.isRunning = false;
@@ -174,11 +196,19 @@ class InstagramBot {
             }
             return;
         }
-        logger.debug(`Received event: ${event.type || "unknown"} from ${event.senderID || event.user_id || "unknown"}`);
-        this.resetWatchdog();
+
         if (!event) return;
 
+        logger.debug(`Received event: ${event.type || "unknown"} from ${event.senderID || event.user_id || "unknown"}`);
+        this.resetWatchdog();
+
         const normalizedEvent = this.normalizeEvent(event);
+
+        // Anti-ban: Auto mark as read if enabled
+        if (config.OPTIONS_FCA?.autoMarkRead && normalizedEvent.threadID && this.api.markAsRead) {
+            this.api.markAsRead(normalizedEvent.threadID).catch(() => {});
+        }
+
         this.eventLoader.handleEvent(normalizedEvent.type, normalizedEvent);
     });
 
@@ -204,20 +234,20 @@ class InstagramBot {
       const normalized = { ...event };
 
       // Ensure threadID is always a string and present as threadID and threadId
-      const tid = normalized.threadID || normalized.thread_id || normalized.threadId;
+      const tid = normalized.threadID || normalized.thread_id || normalized.threadId || normalized.thread_pk;
       if (tid) {
           normalized.threadID = String(tid);
           normalized.threadId = String(tid);
       }
 
       // Ensure senderID is always a string
-      const sid = normalized.senderID || normalized.user_id || normalized.userId;
+      const sid = normalized.senderID || normalized.user_id || normalized.userId || normalized.user_pk;
       if (sid) {
           normalized.senderID = String(sid);
       }
 
       // Ensure messageID is always a string
-      const mid = normalized.messageID || normalized.item_id || normalized.itemId;
+      const mid = normalized.messageID || normalized.item_id || normalized.itemId || normalized.item_pk;
       if (mid) {
           normalized.messageID = String(mid);
       }
@@ -236,6 +266,12 @@ class InstagramBot {
       sendMessage: async (form, threadID, callback, replyToMessageID) => {
           let finalForm = form;
           if (typeof form === 'string') finalForm = { body: form };
+
+          // Anti-ban: Typing indicator
+          if (config.TYPING_INDICATOR?.enable && wrapper.sendTypingIndicator) {
+              await wrapper.sendTypingIndicator(threadID, config.TYPING_INDICATOR_DURATION || 1500).catch(() => {});
+          }
+
           try {
               const res = await ig.sendMessage(finalForm, threadID, null, replyToMessageID);
               if (callback) callback(null, res);
@@ -244,6 +280,10 @@ class InstagramBot {
               if (callback) callback(e);
               throw e;
           }
+      },
+      sendTypingIndicator: async (threadID, duration = 1500) => {
+          if (typeof ig.sendTypingIndicator === 'function') return await ig.sendTypingIndicator(threadID, duration);
+          // Fallback if not available
       },
       getUserInfo: async (id) => {
           if (typeof ig.getUserInfo === 'function') return await ig.getUserInfo(id);
@@ -393,20 +433,26 @@ class InstagramBot {
   scheduleReconnect() {
       this.reconnectAttempts++;
       const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
-      logger.info(`Scheduling reconnect in ${delay/1000}s...`);
+      logger.info(`Scheduling reconnect in ${delay/1000}s... (Attempt ${this.reconnectAttempts})`);
       setTimeout(() => this.start(), delay);
   }
 
   keepAlive() {
-      process.on('SIGINT', () => process.exit(0));
-      process.on('SIGTERM', () => process.exit(0));
+      process.on('SIGINT', () => {
+          logger.info('SIGINT received. Shutting down...');
+          process.exit(0);
+      });
+      process.on('SIGTERM', () => {
+          logger.info('SIGTERM received. Shutting down...');
+          process.exit(0);
+      });
   }
 
   _scheduleAutoRestart() {
       if (config.AUTO_RESTART_TIME) {
           const cron = require('node-cron');
           cron.schedule(config.AUTO_RESTART_TIME, () => {
-              logger.info('Auto-restarting bot...');
+              logger.info('Auto-restarting bot based on schedule...');
               process.exit(1);
           });
       }

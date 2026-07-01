@@ -1,62 +1,51 @@
-# INSTAGRAM_SETUP.md
+# Instagram Setup & Best Practices
 
-## 🍪 Instagram Cookie Setup (Detailed)
+## 🍪 Cookie Authentication
 
-GoatBot-IG uses your browser cookies to authenticate with Instagram. This is safer than email/password login and bypasses most security checks.
+GoatBot-IG-Port uses **Netscape HTTP Cookie format** for session persistence.
 
-### 1. Install Cookie-Editor
-- [Chrome Extension](https://chrome.google.com/webstore/detail/cookie-editor/hlkenndednhfkekhgcdicdfddnkalmdm)
-- [Firefox Add-on](https://addons.mozilla.org/en-US/firefox/addon/cookie-editor/)
-
-### 2. Export Cookies
-1. Log in to [Instagram](https://www.instagram.com) on your computer.
-2. Click the **Cookie-Editor** icon in your extension bar.
-3. Click the **Export** button at the bottom.
-4. Select **Netscape** format (Required!).
-5. The cookies will be copied to your clipboard.
-
-### 3. Add to Bot
-1. Create a file named `account.txt` in the root folder of the bot.
-2. Paste the copied cookies into this file.
-3. Save and close.
-
----
+1. Install **Cookie-Editor** (Chrome/Firefox).
+2. Log in to your Instagram bot account.
+3. Click **Export** → **Netscape**.
+4. Paste the content into `account.txt` in the root directory.
 
 ## 🛡️ Anti-Ban Best Practices
 
-Using a bot on Instagram carries risks. Follow these guidelines to keep your account safe:
+To keep your account safe, we've implemented several "Human Behavior" features:
 
-### 1. Use Natural Delays
-The bot is now equipped with `humanDelay`. It introduces a random delay (default 500ms - 2000ms) before responding.
-- **Config:** `humanDelay` in `config/default.json`.
+### 1. Natural Delays (`humanDelay`)
+The bot introduces a random delay before executing commands or replying. This prevents "bot-like" rapid-fire responses.
+- **Recommendation**: Set `min` to at least 1000ms and `max` to 3000ms.
 
-### 2. Enable Realism Features
-- **Typing Indicators:** `typingIndicator` is enabled by default. It makes the bot look like it's typing before sending a message.
-- **Read Receipts:** The bot can automatically mark messages as seen.
+### 2. Typing Indicators (`typingIndicator`)
+Simulates the "..." typing animation before the bot sends a message.
+- **Enable**: Set `typingIndicator.enable` to `true` in config.
 
-### 3. Avoid Spamming
-- Don't run the bot 24/7 on a new account.
-- Limit the number of groups the bot is in.
-- Use the built-in `spamProtection` to auto-ban users who abuse commands.
+### 3. Automatic Read Receipts
+The bot can automatically mark messages as read to appear more active.
+- **Enable**: Set `optionsFca.autoMarkRead` to `true`.
 
-### 4. Dedicated Account
-**Strongly Recommended:** Use a dedicated Instagram account for the bot, not your personal one.
+### 4. Exponential Backoff
+If the bot hits a rate limit (429 Error) or a spam block, it will automatically pause and retry with increasing intervals.
 
----
+## 📜 Logging & Auditing
 
-## ⚙️ New Logging Features
+All bot activity is logged using **Winston**.
+- **Console**: Beautifully colored logs for development.
+- **Files**: Daily rotating logs in `logs/` folder.
+- **Remote**: Optional Discord Webhook for critical errors and warnings.
 
-The logging system has been upgraded to a production-grade winston setup:
-- **Colored Console:** Easy to read logs with timestamps and levels.
-- **Daily Rotation:** Logs are saved in `./logs/` and rotated daily.
-- **Structured JSON:** Logs are saved as JSON for easy parsing.
-- **Discord Webhook:** (Optional) Forward logs to a Discord channel.
-  - Set `logging.webhookUrl` in `config/default.json`.
+## 📊 Monitoring
 
----
+Use the **Live Dashboard** at `http://localhost:3000` to monitor:
+- **Thread activity**
+- **User engagement**
+- **System logs in real-time**
 
-## 🤖 AI Fallback
+## ❓ FAQ
 
-If a user sends a message starting with the prefix that doesn't match any command, the bot can forward it to an AI command (like `gpt`).
-- **Enable:** Set `AI_FALLBACK.enable` to `true` in `config/default.json`.
-- **Command:** Set `AI_FALLBACK.command` to the name of your AI command (e.g., `"gpt"`).
+**Q: My bot got "CHECKPOINT_REQUIRED"**
+A: Log in to Instagram on your browser, complete the verification, and re-export fresh cookies to `account.txt`.
+
+**Q: Can I use multiple accounts?**
+A: One bot instance per account. Run multiple processes on different ports for multiple accounts.

@@ -10,9 +10,5 @@ module.exports = {
     warn: (message, meta = {}) => log.warn(message, meta),
     error: (message, meta = {}) => log.error(message, meta),
     debug: (message, meta = {}) => log.debug(message, meta),
-    command: (name, user, ok = true) => {
-        const message = `${name} executed by ${user}`;
-        if (ok) log.success('COMMAND', message);
-        else log.error('COMMAND', message);
-    }
+    command: (name, user, threadID, status = 'SUCCESS') => log.command(name, user, threadID, status)
 };

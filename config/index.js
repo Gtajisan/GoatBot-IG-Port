@@ -125,9 +125,9 @@ module.exports = {
   },
 
   TYPING_INDICATOR:          c.typingIndicator?.enable   ?? true,
-  TYPING_INDICATOR_DURATION: c.typingIndicator?.duration ?? 500,
+  TYPING_INDICATOR_DURATION: c.typingIndicator?.duration ?? 1500,
 
-  HUMAN_DELAY: c.humanDelay || { min: 500, max: 2000 },
+  HUMAN_DELAY: c.humanDelay || { min: 1000, max: 3000 },
   LOGGING:     c.logging || { logLevel: 'info', logToFile: true, webhookUrl: '' },
   AI_FALLBACK: c.AI_FALLBACK || { enable: false, command: 'gpt' },
 
