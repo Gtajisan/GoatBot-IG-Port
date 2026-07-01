@@ -89,22 +89,19 @@ class InstagramBot {
         throw new Error('No credentials found. Please provide IG_COOKIES or set up account.txt / EMAIL & PASSWORD.');
     }
 
-    // User explicitly requested to "fix the fca keep our old fca remove new"
-    // We restore Instagram-FCA as primary.
     logger.info('Logging in with Instagram-FCA (Primary)...');
     try {
         this.fca = await loginFca(credentials, config.OPTIONS_FCA);
         logger.info('Instagram-FCA login successful');
     } catch (e) {
         logger.error('Instagram-FCA login failed', { error: e.message });
-        // Attempt nkxica if FCA fails
         logger.info('Attempting login with nkxica (Fallback)...');
         try {
             this.nkxica = await loginNkxica(credentials);
             logger.info('nkxica login successful');
         } catch (nkErr) {
             logger.error('nkxica login failed', { error: nkErr.message });
-            throw e; // Throw original FCA error
+            throw e;
         }
     }
 
@@ -135,23 +132,28 @@ class InstagramBot {
 
     const nkxicaWrapper = this.nkxica ? this.createNkxicaWrapper() : null;
 
-    // Default to FCA if available, else nkxica
     this.api = this.fca || nkxicaWrapper;
 
     if (this.fca && nkxicaWrapper) {
-        // Use DualFca with FCA as primary and nkxica as secondary fallback
         this.api = createDualFca(this.fca, nkxicaWrapper);
     }
 
     global.GoatBot.fcaApi = this.api;
     global.api = this.api;
 
-    // Start listening
     this.api.listen((err, event) => {
-        if (err) return logger.error('Listen error', { error: err.message });
+        if (err) {
+            logger.error('Listen error', { error: err.message });
+            // If the listener has a fatal error, we schedule a reconnect
+            if (this.isRunning && this.shouldReconnect) {
+                logger.warn('Fatal listen error detected. Restarting bot...');
+                this.isRunning = false;
+                this.scheduleReconnect();
+            }
+            return;
+        }
         if (!event) return;
 
-        // Normalize event for GoatBot
         const normalizedEvent = this.normalizeEvent(event);
         this.eventLoader.handleEvent(normalizedEvent.type, normalizedEvent);
     });
@@ -175,7 +177,6 @@ class InstagramBot {
   }
 
   normalizeEvent(event) {
-      // Ensure threadID and senderID are present and strings
       const normalized = { ...event };
       if (normalized.thread_id) normalized.threadID = String(normalized.thread_id);
       if (normalized.threadID) normalized.threadID = String(normalized.threadID);
@@ -186,7 +187,6 @@ class InstagramBot {
       if (normalized.item_id) normalized.messageID = String(normalized.item_id);
       if (normalized.messageID) normalized.messageID = String(normalized.messageID);
 
-      // Map GoatBot specific fields if needed
       normalized.threadId = normalized.threadID;
 
       return normalized;
@@ -245,6 +245,12 @@ class InstagramBot {
   startHealthServer() {
       const port = parseInt(process.env.PORT || config.DASHBOARD_PORT || 3000, 10);
       const server = http.createServer((req, res) => {
+          const url = new URL(req.url, `http://${req.headers.host}`);
+          if (url.pathname === '/uptime') {
+              res.writeHead(200);
+              res.end('OK');
+              return;
+          }
           res.writeHead(200);
           res.end('Bot is running');
       });
@@ -279,15 +285,21 @@ class InstagramBot {
   }
 
   _scheduleAutoUptime() {
-      if (config.AUTO_UPTIME_ENABLE && config.AUTO_UPTIME_URL) {
+      if (config.AUTO_UPTIME_ENABLE) {
           const axios = require('axios');
+          const uptimeUrl = process.env.RENDER_EXTERNAL_URL ? `${process.env.RENDER_EXTERNAL_URL}/uptime` : config.AUTO_UPTIME_URL;
+
+          if (!uptimeUrl) return;
+
           setInterval(async () => {
               try {
-                  await axios.get(config.AUTO_UPTIME_URL);
+                  await axios.get(uptimeUrl);
               } catch (e) {
                   // ignore
               }
-          }, config.AUTO_UPTIME_INTERVAL * 1000);
+          }, (config.AUTO_UPTIME_INTERVAL || 180) * 1000);
+
+          logger.info(`Auto-uptime enabled for: ${uptimeUrl}`);
       }
   }
 }

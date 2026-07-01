@@ -57,6 +57,11 @@ const getPendingThreads = require('./methods/getPendingThreads');
 const getPresence = require('./methods/getPresence');
 const listen = require('./methods/listen');
 
+// Extensions for compatibility
+const sendPhotoFromUrl = require('./methods/sendPhotoFromUrl');
+const sendVideoFromUrl = require('./methods/sendVideoFromUrl');
+const sendAudioFromUrl = require('./methods/sendAudioFromUrl');
+
 class API extends EventEmitter {
   constructor(session, httpClient, options = {}) {
     super();
@@ -119,6 +124,11 @@ class API extends EventEmitter {
     this.unsendMessage = unsendMessage.bind(this);
     this.reactMessage = reactMessage.bind(this);
     this.sendTypingIndicator = sendTypingIndicator.bind(this);
+
+    // Extensions
+    this.sendPhotoFromUrl = sendPhotoFromUrl.bind(this);
+    this.sendVideoFromUrl = sendVideoFromUrl.bind(this);
+    this.sendAudioFromUrl = sendAudioFromUrl.bind(this);
 
     // Thread operations
     this.getThreadList = getThreadList.bind(this);
