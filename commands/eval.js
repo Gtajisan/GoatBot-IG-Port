@@ -1,25 +1,24 @@
 module.exports = {
   config: {
     name: "eval",
-    aliases: ["ev"],
     version: "1.0",
-    author: "Gtajisan",
+    author: "NTKhang",
     cooldown: 0,
     role: 4,
     description: "Evaluate JavaScript code",
-    category: "owner"
+    category: "system",
+    usage: "{pn} <code>"
   },
 
-  async onStart({ api, event, args, message, usersData, threadsData, database, bot }) {
+  async onStart({ message, event, args, api, bot, database, usersData, threadsData }) {
     const code = args.join(" ");
     if (!code) return message.reply("Please provide code to evaluate.");
 
     try {
       const result = await eval(`(async () => { ${code} })()`);
-      const output = typeof result === "object" ? JSON.stringify(result, null, 2) : String(result);
-      message.reply(`✓ Result:\n\n${output.substring(0, 2000)}`);
+      return message.reply(`✅ Result: ${JSON.stringify(result, null, 2)}`);
     } catch (e) {
-      message.reply(`✗ Error:\n\n${e.message}`);
+      return message.reply(`❌ Error: ${e.message}`);
     }
   }
 };

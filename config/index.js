@@ -153,7 +153,7 @@ module.exports = {
   ENABLE_FILE_LOGGING:    true,
   ENABLE_CONSOLE_LOGGING: true,
 
-  MESSAGE_DELAY_MS: c.messageDelayMs ?? 100,
+  MESSAGE_DELAY_MS: c.messageDelayMs ?? 100, EXPERIMENTAL_FCA_ENABLE: c.experimentalFca?.enable ?? false, USE_FCA_FALLBACK: c.useFcaFallback || { text: false, image: false, video: false, audio: false },
 
   AUTO_RECONNECT:         true,
   MAX_RECONNECT_ATTEMPTS: 5,

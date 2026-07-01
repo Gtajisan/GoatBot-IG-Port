@@ -1,72 +1,35 @@
-const { createCanvas, loadImage } = require("canvas");
-const fs = require("fs-extra");
-const path = require("path");
-const moment = require("moment-timezone");
-
-const BANK_NAME = "GOAT BANK";
-const CURRENCY_SYMBOL = "$";
-
 module.exports = {
   config: {
     name: "bank",
-    aliases: ["atm"],
-    version: "2.0",
-    author: "Neoaz",
+    version: "1.0",
+    author: "NTKhang",
     cooldown: 5,
     role: 0,
-    description: "Banking",
-    category: "economy"
+    description: "Banking system",
+    category: "economy",
+    usage: "{pn} deposit <amount> | {pn} withdraw <amount>"
   },
 
-  async onStart({ args, message, event, usersData, database }) {
-    const { senderID } = event;
-    let userData = await usersData.get(senderID);
-    if (!userData.data) userData.data = {};
-    if (!userData.data.bank) {
-        userData.data.bank = { balance: 0, transactions: [] };
-    }
-
+  async onStart({ message, event, args, database }) {
     const action = args[0]?.toLowerCase();
+    const amount = parseInt(args[1]);
+    const userData = await database.getUser(event.senderID);
+    if (!userData.bank) userData.bank = 0;
 
-    if (!action) {
-      return message.reply(`🏦 ${BANK_NAME}\n• bank register\n• bank balance\n• bank deposit <amt>\n• bank withdraw <amt>`);
+    if (action === "deposit") {
+      if (isNaN(amount) || amount <= 0 || (userData.money || 0) < amount) return message.reply("❌ Invalid amount.");
+      userData.money -= amount;
+      userData.bank += amount;
+      await database.updateUser(event.senderID, userData);
+      return message.reply(`✅ Deposited ${amount}$ to your bank.`);
+    } else if (action === "withdraw") {
+      if (isNaN(amount) || amount <= 0 || userData.bank < amount) return message.reply("❌ Invalid amount.");
+      userData.bank -= amount;
+      userData.money = (userData.money || 0) + amount;
+      await database.updateUser(event.senderID, userData);
+      return message.reply(`✅ Withdrew ${amount}$ from your bank.`);
     }
 
-    switch (action) {
-      case "register":
-        message.reply("✅ Bank account activated!");
-        break;
-
-      case "balance":
-      case "bal":
-        message.reply(`💳 ${BANK_NAME}\nOwner: ${userData.name}\nBalance: ${CURRENCY_SYMBOL}${userData.data.bank.balance.toLocaleString()}`);
-        break;
-
-      case "deposit":
-      case "dep":
-        const depAmt = parseInt(args[1]);
-        if (isNaN(depAmt) || depAmt <= 0) return message.reply("Invalid amount.");
-        if ((userData.money || 0) < depAmt) return message.reply("Insufficient wallet funds.");
-
-        userData.money -= depAmt;
-        userData.data.bank.balance += depAmt;
-        await usersData.set(senderID, userData);
-        database.updateUser(senderID, { money: userData.money });
-        message.reply(`✅ Deposited ${CURRENCY_SYMBOL}${depAmt.toLocaleString()}`);
-        break;
-
-      case "withdraw":
-      case "wd":
-        const wdAmt = parseInt(args[1]);
-        if (isNaN(wdAmt) || wdAmt <= 0) return message.reply("Invalid amount.");
-        if (userData.data.bank.balance < wdAmt) return message.reply("Insufficient bank balance.");
-
-        userData.data.bank.balance -= wdAmt;
-        userData.money = (userData.money || 0) + wdAmt;
-        await usersData.set(senderID, userData);
-        database.updateUser(senderID, { money: userData.money });
-        message.reply(`✅ Withdrew ${CURRENCY_SYMBOL}${wdAmt.toLocaleString()}`);
-        break;
-    }
+    return message.reply(`🏦 BANK\n- Cash: ${userData.money || 0}$\n- Bank: ${userData.bank}$\n\nUsage: bank deposit/withdraw <amount>`);
   }
 };
