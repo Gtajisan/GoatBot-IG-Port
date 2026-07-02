@@ -47,7 +47,7 @@
   .user-cell{display:flex;align-items:center;gap:10px}
   .log-box{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px;height:500px;overflow-y:auto;font-family:'Courier New',monospace;font-size:.78rem;line-height:1.6}
   .log-line{padding:2px 0;border-bottom:1px solid rgba(48,54,61,.3)}
-  .log-INFO{color:var(--green)}.log-ERROR{color:var(--red)}.log-WARN{color:var(--yellow)}.log-DEBUG{color:var(--sub)}
+  .log-info{color:var(--green)}.log-error{color:var(--red)}.log-warn{color:var(--yellow)}.log-debug{color:var(--sub)}.log-success{color:var(--cyan)}
   .refresh-btn{background:var(--card);border:1px solid var(--border);color:var(--text);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:.82rem;display:flex;align-items:center;gap:6px;transition:.15s}
   .refresh-btn:hover{border-color:var(--accent2);color:var(--accent2)}
   .progress-bar{background:rgba(255,255,255,.08);border-radius:4px;height:6px;overflow:hidden;margin-top:8px}
@@ -226,10 +226,11 @@
     <div style="display:flex;gap:8px;align-items:center">
       <select id="log-level" onchange="filterLogs()" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:.82rem;cursor:pointer">
         <option value="">All Levels</option>
-        <option value="INFO">INFO</option>
-        <option value="WARN">WARN</option>
-        <option value="ERROR">ERROR</option>
-        <option value="DEBUG">DEBUG</option>
+        <option value="info">INFO</option>
+        <option value="success">SUCCESS</option>
+        <option value="warn">WARN</option>
+        <option value="error">ERROR</option>
+        <option value="debug">DEBUG</option>
       </select>
       <button class="refresh-btn" onclick="loadLogs()">↻ Refresh</button>
       <button class="refresh-btn" onclick="toggleAutoRefresh()" id="auto-refresh-btn">⏸ Auto OFF</button>
@@ -509,7 +510,12 @@ function filterLogs(){
   const lv=document.getElementById('log-level').value;
   const lines=allLogs.filter(l=>!lv||l.level===lv);
   const box=document.getElementById('log-box');
-  box.innerHTML=lines.map(l=>`<div class="log-line log-${l.level||'INFO'}"><span style="color:var(--sub)">${l.time||''}</span> <span style="opacity:.6">[${l.level||''}]</span> ${escHtml(l.message||'')}</div>`).join('');
+  box.innerHTML=lines.map(l=>{
+    const level = (l.level || 'info').toLowerCase();
+    const time = l.timestamp || l.time || '';
+    const tag = l.tag ? `[${l.tag}] ` : '';
+    return `<div class="log-line log-${level}"><span style="color:var(--sub)">${time}</span> <span style="opacity:.6">[${level.toUpperCase()}]</span> ${tag}${escHtml(l.message||'')}</div>`;
+  }).join('');
   box.scrollTop=box.scrollHeight;
 }
 

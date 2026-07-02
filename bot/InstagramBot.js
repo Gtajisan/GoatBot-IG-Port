@@ -22,7 +22,7 @@ class InstagramBot {
     this.commandLoader = new CommandLoader();
     this.eventLoader = new EventLoader(this);
     this.reconnectAttempts = 0;
-    this.shouldReconnect = config.AUTO_RECONNECT;
+    this.shouldReconnect = config.AUTO_RECONNECT !== false;
     this.isRunning = false;
     this.watchdogTimer = null;
     this.WATCHDOG_DELAY = 15 * 60 * 1000; // 15 minutes
@@ -41,6 +41,20 @@ class InstagramBot {
 
     global.utils = require('../utils.js');
     global.api = null;
+
+    this.setupProcessHandlers();
+  }
+
+  setupProcessHandlers() {
+      process.on('unhandledRejection', (reason, promise) => {
+          logger.error('Unhandled Rejection', { reason, promise });
+      });
+
+      process.on('uncaughtException', (error) => {
+          logger.error('Uncaught Exception', { error: error.message, stack: error.stack });
+          // Give logger time to write to file before exiting
+          setTimeout(() => process.exit(1), 1000);
+      });
   }
 
   async start() {
@@ -48,6 +62,7 @@ class InstagramBot {
     this.keepAlive();
 
     try {
+      logger.info('Starting bot initialization...');
       await this.commandLoader.loadAll();
       await this.eventLoader.loadAll();
 
@@ -61,16 +76,14 @@ class InstagramBot {
       this.isRunning = true;
 
       this.eventLoader.handleEvent('ready', this);
+      logger.success('Bot is now online and ready!');
 
     } catch (error) {
       logger.error('Failed to start bot', { error: error.message, stack: error.stack });
-      if (this.shouldReconnect && this.reconnectAttempts < config.MAX_RECONNECT_ATTEMPTS) {
+      if (this.shouldReconnect && this.reconnectAttempts < (config.MAX_RECONNECT_ATTEMPTS || 10)) {
         this.scheduleReconnect();
-                if (config.AUTO_RESTART_WHEN_MQTT_ERROR) {
-                    logger.info("Auto-restart enabled. Exiting process...");
-                    setTimeout(() => process.exit(1), 1000);
-                }
       } else {
+        logger.error('Max reconnect attempts reached or auto-reconnect disabled. Exiting.');
         process.exit(1);
       }
     }
@@ -79,8 +92,8 @@ class InstagramBot {
   async loadAndLogin() {
     let credentials = config.ACCOUNT_COOKIES;
 
-    if (!credentials && fs.existsSync(config.ACCOUNT_FILE)) {
-        credentials = fs.readFileSync(config.ACCOUNT_FILE, 'utf-8');
+    if (!credentials && fs.existsSync(config.ACCOUNT_FILE || 'account.txt')) {
+        credentials = fs.readFileSync(config.ACCOUNT_FILE || 'account.txt', 'utf-8');
     }
 
     if (!credentials && config.ACCOUNT_EMAIL && config.ACCOUNT_PASSWORD) {
@@ -98,24 +111,24 @@ class InstagramBot {
     logger.info('Logging in with nkxica (Primary)...');
     try {
         this.nkxica = await loginNkxica(credentials);
-        logger.info('nkxica login successful');
+        logger.success('nkxica login successful');
     } catch (e) {
-        logger.error('nkxica login failed', { error: e.message });
+        logger.warn('nkxica login failed', { error: e.message });
         logger.info('Attempting login with Instagram-FCA (Fallback)...');
         try {
             this.fca = await loginFca(credentials, config.OPTIONS_FCA);
-            logger.info('Instagram-FCA login successful');
+            logger.success('Instagram-FCA login successful');
         } catch (fcaErr) {
             logger.error('Instagram-FCA login failed', { error: fcaErr.message });
             throw e;
         }
     }
 
-    if (config.EXPERIMENTAL_FCA_ENABLE && !this.fca) {
+    if (config.EXPERIMENTAL_FCA?.enable && !this.fca) {
         try {
-            logger.info('Logging in with Instagram-FCA (Secondary)...');
+            logger.info('Logging in with Instagram-FCA (Secondary/Experimental)...');
             this.fca = await loginFca(credentials, config.OPTIONS_FCA);
-            logger.info('Instagram-FCA login successful');
+            logger.success('Instagram-FCA login successful');
         } catch (e) {
             logger.warn('Instagram-FCA login failed, continuing with nkxica only.');
         }
@@ -162,23 +175,26 @@ class InstagramBot {
     this.api.listen((err, event) => {
         if (err) {
             logger.error('Listen error', { error: err.message });
-            // If the listener has a fatal error, we schedule a reconnect
             if (this.isRunning && this.shouldReconnect) {
                 logger.warn('Fatal listen error detected. Restarting bot...');
                 this.isRunning = false;
                 this.scheduleReconnect();
-                if (config.AUTO_RESTART_WHEN_MQTT_ERROR) {
-                    logger.info("Auto-restart enabled. Exiting process...");
-                    setTimeout(() => process.exit(1), 1000);
-                }
             }
             return;
         }
-        logger.debug(`Received event: ${event.type || "unknown"} from ${event.senderID || event.user_id || "unknown"}`);
-        this.resetWatchdog();
+
         if (!event) return;
 
+        logger.debug(`Received event: ${event.type || "unknown"}`, { senderID: event.senderID || event.user_id, threadID: event.threadID || event.thread_id });
+        this.resetWatchdog();
+
         const normalizedEvent = this.normalizeEvent(event);
+
+        // Anti-ban: Auto mark as read if enabled
+        if (config.OPTIONS_FCA?.autoMarkRead && normalizedEvent.threadID && this.api.markAsRead) {
+            this.api.markAsRead(normalizedEvent.threadID).catch(() => {});
+        }
+
         this.eventLoader.handleEvent(normalizedEvent.type, normalizedEvent);
     });
 
@@ -203,26 +219,22 @@ class InstagramBot {
   normalizeEvent(event) {
       const normalized = { ...event };
 
-      // Ensure threadID is always a string and present as threadID and threadId
       const tid = normalized.threadID || normalized.thread_id || normalized.threadId;
       if (tid) {
           normalized.threadID = String(tid);
           normalized.threadId = String(tid);
       }
 
-      // Ensure senderID is always a string
       const sid = normalized.senderID || normalized.user_id || normalized.userId;
       if (sid) {
           normalized.senderID = String(sid);
       }
 
-      // Ensure messageID is always a string
       const mid = normalized.messageID || normalized.item_id || normalized.itemId;
       if (mid) {
           normalized.messageID = String(mid);
       }
 
-      // Handle body
       normalized.body = normalized.body || normalized.text || '';
 
       return normalized;
@@ -259,6 +271,9 @@ class InstagramBot {
       markAsRead: async (threadID) => {
           if (typeof ig.markAsRead === 'function') return await ig.markAsRead(threadID);
       },
+      sendTypingIndicator: async (threadID) => {
+          if (typeof ig.sendTypingIndicator === 'function') return await ig.sendTypingIndicator(threadID);
+      },
       listen: (callback) => {
           if (typeof ig.listen === 'function') return ig.listen(callback);
       },
@@ -284,7 +299,6 @@ class InstagramBot {
           const url = new URL(req.url, `http://${req.headers.host}`);
           const pathname = url.pathname;
 
-          // Dashboard HTML
           if (pathname === '/' || pathname === '/index.html') {
               const dashPath = path.join(__dirname, '../dashboard/index.html');
               if (fs.existsSync(dashPath)) {
@@ -298,7 +312,6 @@ class InstagramBot {
               return res.end('OK');
           }
 
-          // API Endpoints (Supports both /api/path and /path for dashboard compatibility)
           const apiPath = pathname.startsWith('/api/') ? pathname.slice(4) : pathname;
 
           if (pathname.startsWith('/api/') || ['/status', '/threads', '/thread', '/users', '/commands', '/logs'].some(p => pathname.startsWith(p))) {
@@ -358,7 +371,7 @@ class InstagramBot {
                       if (files.length > 0) {
                           const content = fs.readFileSync(path.join(logDir, files[0]), 'utf-8');
                           const lines = content.split('\n').filter(Boolean).slice(-300).map(l => {
-                              try { return JSON.parse(l); } catch(e) { return { message: l, level: 'INFO', time: new Date().toISOString() }; }
+                              try { return JSON.parse(l); } catch(e) { return { message: l, level: 'info', timestamp: new Date().toISOString() }; }
                           });
                           return res.end(JSON.stringify({ logs: lines }));
                       }
@@ -383,17 +396,13 @@ class InstagramBot {
       this.watchdogTimer = setTimeout(() => {
           logger.warn('Watchdog timeout: No events received for 15 minutes. Reconnecting...');
           this.scheduleReconnect();
-                if (config.AUTO_RESTART_WHEN_MQTT_ERROR) {
-                    logger.info("Auto-restart enabled. Exiting process...");
-                    setTimeout(() => process.exit(1), 1000);
-                }
       }, this.WATCHDOG_DELAY);
   }
 
   scheduleReconnect() {
       this.reconnectAttempts++;
       const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
-      logger.info(`Scheduling reconnect in ${delay/1000}s...`);
+      logger.info(`Scheduling reconnect in ${delay/1000}s... (Attempt ${this.reconnectAttempts})`);
       setTimeout(() => this.start(), delay);
   }
 

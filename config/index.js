@@ -124,12 +124,10 @@ module.exports = {
     presence:         c.logEvents?.presence        ?? false
   },
 
-  TYPING_INDICATOR:          c.typingIndicator?.enable   ?? true,
-  TYPING_INDICATOR_DURATION: c.typingIndicator?.duration ?? 500,
-
-  HUMAN_DELAY: c.humanDelay || { min: 500, max: 2000 },
-  LOGGING:     c.logging || { logLevel: 'info', logToFile: true, webhookUrl: '' },
-  AI_FALLBACK: c.AI_FALLBACK || { enable: false, command: 'gpt' },
+  TYPING_INDICATOR:          c.typingIndicator || { enable: true, duration: 1500 },
+  HUMAN_DELAY:               c.humanDelay || { enable: true, min: 1500, max: 4000 },
+  LOGGING:                   c.logging || { logLevel: 'info', logToFile: true, webhookUrl: '' },
+  AI_FALLBACK:               c.AI_FALLBACK || { enable: false, command: 'gpt' },
 
   AUTO_REMOVE_ERROR: c.autoRemoveError || { enable: true, delay: 10 },
 
