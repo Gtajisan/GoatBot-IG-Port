@@ -19,6 +19,16 @@ function simplifyObject(obj) {
                 : (typeof obj.response?.data === 'object' ? '[Object]' : obj.response?.data)
         };
     }
+
+    // Handle standard Error objects
+    if (obj instanceof Error) {
+        return {
+            name: obj.name,
+            message: obj.message,
+            stack: obj.stack?.split('\n').slice(0, 3).join('\n') + '\n    ...'
+        };
+    }
+
     return obj;
 }
 
@@ -50,22 +60,21 @@ function formatAndLog(level, args) {
 
     // Apply simplification to message and meta properties
     const processedMessage = simplifyObject(message);
-    if (meta.error) meta.error = simplifyObject(meta.error);
-    if (meta.reason) meta.reason = simplifyObject(meta.reason);
-    if (meta.details) {
-        if (Array.isArray(meta.details)) meta.details = meta.details.map(simplifyObject);
-        else meta.details = simplifyObject(meta.details);
+    const processedMeta = {};
+
+    for (const key in meta) {
+        processedMeta[key] = simplifyObject(meta[key]);
     }
 
     logger.log({
         level,
         tag,
         message: typeof processedMessage === 'object' ? JSON.stringify(processedMessage, null, 2) : String(processedMessage),
-        ...meta
+        ...processedMeta
     });
 }
 
-module.exports = {
+const log = {
     err: (...args) => formatAndLog('error', args),
     error: (...args) => formatAndLog('error', args),
     warn: (...args) => formatAndLog('warn', args),
@@ -75,8 +84,9 @@ module.exports = {
     debug: (...args) => formatAndLog('debug', args),
     master: (...args) => formatAndLog('info', ['MASTER', ...args]),
     dev: (...args) => {
-        // Log dev messages if NODE_ENV is development or if specifically enabled in config
-        if (process.env.NODE_ENV === 'development') formatAndLog('debug', ['DEV', ...args]);
+        formatAndLog('debug', ['DEV', ...args]);
     },
     load: (...args) => formatAndLog('info', ['LOAD', ...args])
 };
+
+module.exports = log;

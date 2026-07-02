@@ -6,6 +6,7 @@ const PermissionManager = require('../utils/permissions');
 const ConfigManager = require('../utils/configManager');
 const moderation = require('../utils/moderation');
 const Banner = require('../utils/banner');
+const utils = require('../utils.js');
 
 module.exports = {
   config: {
@@ -29,7 +30,11 @@ module.exports = {
           if (replyData && replyData.commandName) {
               const command = commandLoader.getCommand(replyData.commandName);
               if (command && typeof command.onReply === 'function') {
-                  const getLang = (...args) => require('../utils.js').getText(command.config.name, ...args);
+                  const getLang = (...args) => utils.getText(command.config.name, ...args);
+
+                  // Apply human delay before replying if configured
+                  if (config.HUMAN_DELAY?.enable) await utils.humanDelay();
+
                   return await command.onReply({
                       api, event, bot, commandName: replyData.commandName,
                       logger, database, usersData: database.usersData,
@@ -64,26 +69,52 @@ module.exports = {
 
       if (!commandName) return;
 
-      const command = commandLoader.getCommand(commandName); if (command) logger.debug(`Executing command: ${commandName} for user: ${event.senderID}`);
+      let command = commandLoader.getCommand(commandName);
+
+      // Alias check
       if (!command) {
-          // Alias check
           for (const [name, cmd] of commandLoader.commands) {
               if (cmd.config.aliases && cmd.config.aliases.includes(commandName)) {
-                  logger.debug(`Executing command alias: ${commandName} (target: ${cmd.config.name}) for user: ${event.senderID}`); return await this.executeCommand(cmd, { api, event, args, bot, commandName: cmd.config.name, logger, database, config, prefix });
+                  command = cmd;
+                  break;
               }
           }
-          return;
       }
 
-      await this.executeCommand(command, { api, event, args, bot, commandName, logger, database, config, prefix });
+      if (command) {
+          logger.debug(`Executing command: ${command.config.name} for user: ${event.senderID}`);
+          await this.executeCommand(command, { api, event, args, bot, commandName: command.config.name, logger, database, config, prefix });
+      } else if (config.AI_FALLBACK?.enable) {
+          // AI Fallback logic
+          const aiCommandName = config.AI_FALLBACK.command || 'gpt';
+          const aiCommand = commandLoader.getCommand(aiCommandName);
+          if (aiCommand) {
+              logger.debug(`Command not found. Routing to AI fallback (${aiCommandName}) for user: ${event.senderID}`);
+              // Re-inject command name into args for AI to process
+              const aiArgs = [commandName, ...args];
+              await this.executeCommand(aiCommand, { api, event, args: aiArgs, bot, commandName: aiCommandName, logger, database, config, prefix });
+          }
+      }
 
     } catch (e) {
-      logger.error('Error in message handler', { error: e.message });
+      logger.error('Error in message handler', { error: e.message, stack: e.stack });
     }
   },
 
   async executeCommand(command, { api, event, args, bot, commandName, logger, database, config, prefix }) {
-      const getLang = (...args) => require('../utils.js').getText(command.config.name, ...args);
+      const getLang = (...args) => utils.getText(command.config.name, ...args);
+
+      // Anti-ban: Random human delay
+      if (config.HUMAN_DELAY?.enable) {
+          await utils.humanDelay();
+      }
+
+      // Anti-ban: Typing indicator
+      if (config.TYPING_INDICATOR?.enable && api.sendTypingIndicator) {
+          api.sendTypingIndicator(event.threadId).catch(() => {});
+          const duration = config.TYPING_INDICATOR.duration || 1500;
+          await new Promise(resolve => setTimeout(resolve, duration));
+      }
 
       const messageHelper = {
           reply: (form, callback) => api.sendMessage(form, event.threadId, callback, event.messageID),
@@ -101,10 +132,17 @@ module.exports = {
           PermissionManager, ConfigManager
       };
 
-      if (typeof command.onStart === 'function') {
-          await command.onStart(params);
-      } else if (typeof command.run === 'function') {
-          await command.run(params);
+      try {
+          if (typeof command.onStart === 'function') {
+              await command.onStart(params);
+          } else if (typeof command.run === 'function') {
+              await command.run(params);
+          }
+          // Command log for structured analytics
+          logger.success('COMMAND', `${commandName} executed by ${event.senderID} in ${event.threadId}`);
+      } catch (error) {
+          logger.error(`Error executing command ${commandName}`, { error: error.message, stack: error.stack });
+          messageHelper.err(error);
       }
   }
 };

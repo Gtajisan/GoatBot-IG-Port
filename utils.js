@@ -851,9 +851,9 @@ const utils = {
 	 * @returns {Promise<void>}
 	 */
 	humanDelay: async (min, max) => {
-		const config = global.GoatBot?.config?.humanDelay || {};
-		const minDelay = min || config.min || 500;
-		const maxDelay = max || config.max || 2000;
+		const humanDelayConfig = global.GoatBot?.config?.HUMAN_DELAY || {};
+		const minDelay = min || humanDelayConfig.min || 500;
+		const maxDelay = max || humanDelayConfig.max || 2000;
 		const delay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
 		return new Promise(resolve => setTimeout(resolve, delay));
 	},
